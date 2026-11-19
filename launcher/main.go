@@ -28,7 +28,10 @@ import (
 // Version is set at build time from launcher/VERSION.
 var Version = "dev"
 
-// ManifestURL is where the list of latest versions lives.
+// The list of latest versions. It's read through GitHub's API first, which
+// always returns the current file; raw.githubusercontent.com (the fallback)
+// can serve a copy up to 5 minutes old after a change.
+var ManifestAPI = "https://api.github.com/repos/jadedthoughts/topramenaddons/contents/manifest.json?ref=main"
 var ManifestURL = "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/manifest.json"
 
 const port = 47321 // fixed, so a second launch just reopens the window
@@ -186,21 +189,39 @@ func detectAddOns() string {
 	return ""
 }
 
-func (a *App) fetchManifest() {
+func getManifest(url string, api bool) (*Manifest, error) {
 	client := &http.Client{Timeout: 20 * time.Second}
-	url := fmt.Sprintf("%s?t=%d", ManifestURL, time.Now().Unix())
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("User-Agent", "TopRamenLauncher/"+Version)
+	if api {
+		req.Header.Set("Accept", "application/vnd.github.raw")
+	}
 	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("the update list answered %s", resp.Status)
+	}
 	var m Manifest
-	if err == nil {
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			err = fmt.Errorf("the update list answered %s", resp.Status)
-		} else {
-			err = json.NewDecoder(resp.Body).Decode(&m)
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+func (a *App) fetchManifest() {
+	var m *Manifest
+	var err error
+	if ManifestAPI != "" {
+		if m, err = getManifest(ManifestAPI, true); err != nil {
+			log.Println("manifest via API:", err, "- trying raw")
 		}
+	}
+	if m == nil {
+		m, err = getManifest(fmt.Sprintf("%s?t=%d", ManifestURL, time.Now().Unix()), false)
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -210,7 +231,7 @@ func (a *App) fetchManifest() {
 		log.Println("manifest:", err)
 		return
 	}
-	a.manifest, a.mErr = &m, nil
+	a.manifest, a.mErr = m, nil
 }
 
 func (a *App) state() State {
@@ -502,7 +523,7 @@ func main() {
 	}
 	log.Printf("Top Ramen Launcher %s starting", Version)
 	if v := os.Getenv("TOPRAMEN_MANIFEST_URL"); v != "" { // for testing
-		ManifestURL = v
+		ManifestURL, ManifestAPI = v, ""
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
 
