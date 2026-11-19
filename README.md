@@ -14,7 +14,7 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 
 ## Install with the launcher (easiest)
 
-1. Download **[TopRamenLauncher.exe](https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenLauncher.exe)**.
+1. Download **[TopRamenLauncher.zip](https://github.com/jadedthoughts/topramenaddons/raw/main/releases/TopRamenLauncher.zip)**, open it, and drag **TopRamenLauncher.exe** to your Desktop (or any folder).
 2. Double-click it. Windows may say "Windows protected your PC" because the file isn't signed: click **More info → Run anyway**.
 3. The launcher finds your `World of Warcraft\_forever_\Interface\AddOns` folder by itself. If it can't, click **Change…** and pick it.
 4. Click **Install** or **Update** next to each addon, or **Update all**. Then `/reload` in game (restart the game for an addon that's new to you).
