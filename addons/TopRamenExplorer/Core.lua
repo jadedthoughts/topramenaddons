@@ -192,7 +192,7 @@ function ns.KnownSpot(zoneName, area)
   local s = ns.db and lookup(ns.db.shared, zoneName, area)
   if s then return s[1], s[2], "shared", "Confirmed by another player (imported)." end
   local k = lookup(ns.KNOWN, zoneName, area)
-  if k then return k[1], k[2], "confirmed", k[3] end
+  if k then return k[1], k[2], "confirmed", k[3] or "Confirmed in game." end
   local u = lookup(ns.UNVERIFIED, zoneName, area)
   if u then return u[1], u[2], "unverified", "Unverified: from a classic-era Wowhead comment. Your discovery will replace it." end
   local c = lookup(ns.CATACLYSM, zoneName, area)
