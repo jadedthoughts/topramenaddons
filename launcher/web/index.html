@@ -43,6 +43,7 @@
   .notice.info { background:var(--active); border-color:var(--trim); color:var(--text); }
   .notice.ok { background:#13261a; border-color:#2b5a3a; color:#c9f5d6; }
   .notice a { color:var(--gold); cursor:pointer; text-decoration:underline; }
+  .notice.lup { display:flex; align-items:center; gap:12px; justify-content:space-between; }
   .list { display:flex; flex-direction:column; gap:8px; }
   .addon { display:grid; grid-template-columns:1fr auto; gap:4px 14px; align-items:center;
     background:var(--row); border:1px solid var(--line); border-radius:8px; padding:11px 14px; }
@@ -135,9 +136,12 @@ function render() {
   let n = '';
   if (flash) n += `<div class="notice ${flash.kind}">${flash.html}</div>`;
   if (s.manifestError) n += `<div class="notice err">${esc(s.manifestError)}</div>`;
-  if (s.launcherUpdate) n += `<div class="notice info">A new launcher (version ${esc(s.launcherUpdate)}) is available. <a id="getLauncher">Download it</a>, then close this one and run the new file.</div>`;
+  if (s.launcherUpdate) n += s.canSelfUpdate
+    ? `<div class="notice info lup"><span>A new launcher (version ${esc(s.launcherUpdate)}) is available.</span><button class="primary small" id="btnSelf">Update launcher</button></div>`
+    : `<div class="notice info">A new launcher (version ${esc(s.launcherUpdate)}) is available. <a id="getLauncher">Download it</a>, then close this one and run the new file.</div>`;
   $('notices').innerHTML = n;
   if ($('getLauncher')) $('getLauncher').onclick = () => api('openURL', { URL: s.launcherUrl });
+  if ($('btnSelf')) { $('btnSelf').disabled = busy; $('btnSelf').onclick = selfUpdate; }
 
   const L = $('list');
   if (!s.addons.length) {
@@ -191,6 +195,23 @@ async function install(folders) {
     }
   } catch (e) { flash = { kind:'err', html: 'Something went wrong: ' + esc(e.message) }; }
   busy = false; render();
+}
+
+async function selfUpdate() {
+  if (busy) return;
+  busy = true; flash = null; render();
+  $('msg').innerHTML = '<span class="spin"></span>Downloading the new launcher…';
+  try {
+    const r = await api('selfUpdate', {});
+    if (r.ok) {
+      document.body.innerHTML = '<div class="empty" style="margin:auto"><span class="spin"></span>Updating the launcher… it will reopen in a moment.</div>';
+      setTimeout(() => window.close(), 1500);
+      return;
+    }
+    flash = { kind:'err', html: esc(r.error) + (state.launcherUrl ? ` <a id="getLauncher2">Download it instead</a>` : '') };
+  } catch (e) { flash = { kind:'err', html: 'Something went wrong: ' + esc(e.message) }; }
+  busy = false; render();
+  if ($('getLauncher2')) $('getLauncher2').onclick = () => api('openURL', { URL: state.launcherUrl });
 }
 
 async function load() { try { state = await api('state'); render(); } catch (e) {} }

@@ -60,7 +60,10 @@ type Manifest struct {
 	TestAddons []ManifestAddon `json:"testAddons"`
 	Launcher   struct {
 		Version string `json:"version"`
-		URL     string `json:"url"`
+		URL     string `json:"url"`    // zip, for downloading by hand
+		Exe     string `json:"exe"`    // the .exe itself (raw URL)
+		ExeAPI  string `json:"exeApi"` // the .exe through GitHub's API (always current)
+		SHA256  string `json:"sha256"` // of the .exe
 	} `json:"launcher"`
 }
 
@@ -85,9 +88,11 @@ type State struct {
 	Addons          []AddonState `json:"addons"`
 	LauncherUpdate  string       `json:"launcherUpdate,omitempty"`
 	LauncherURL     string       `json:"launcherUrl,omitempty"`
+	CanSelfUpdate   bool         `json:"canSelfUpdate,omitempty"`
 }
 
 type App struct {
+	quit      chan func() error // receives the finish step of a self-update
 	mu        sync.Mutex
 	cfg       Config
 	cfgPath   string
@@ -250,6 +255,7 @@ func (a *App) state() State {
 	}
 	if l := a.manifest.Launcher; l.Version != "" && Version != "dev" && compareVersions(l.Version, Version) > 0 {
 		s.LauncherUpdate, s.LauncherURL = l.Version, l.URL
+		s.CanSelfUpdate = l.SHA256 != "" && (l.Exe != "" || l.ExeAPI != "")
 	}
 	s.TestCount = len(a.manifest.TestAddons)
 	list := a.manifest.Addons
@@ -374,6 +380,31 @@ func (a *App) routes() http.Handler {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		writeJSON(w, a.install(body.Folders))
+	})
+	mux.HandleFunc("/api/selfUpdate", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "POST only", 405)
+			return
+		}
+		a.mu.Lock()
+		if a.busy {
+			a.mu.Unlock()
+			writeJSON(w, map[string]any{"error": "Already busy, one moment."})
+			return
+		}
+		a.busy = true
+		a.mu.Unlock()
+		finish, err := a.selfUpdate()
+		if err != nil {
+			a.mu.Lock()
+			a.busy = false
+			a.mu.Unlock()
+			log.Println("self-update:", err)
+			writeJSON(w, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true})
+		go func() { a.quit <- finish }()
 	})
 	mux.HandleFunc("/api/openFolder", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" && runtime.GOOS == "windows" && isAddOnsDir(a.cfg.AddOnsPath) {
@@ -527,14 +558,22 @@ func main() {
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
 
+	justUpdated := len(os.Args) > 1 && os.Args[1] == updatedFlag
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	for i := 0; err != nil && justUpdated && i < 20; i++ {
+		time.Sleep(250 * time.Millisecond) // the old copy is still letting go of the port
+		ln, err = net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	}
+	if justUpdated {
+		go cleanupOld()
+	}
 	if err != nil {
 		// already running: just bring up another window
 		log.Println("already running, opening window:", err)
 		openWindow(url)
 		return
 	}
-	app := &App{lastPing: time.Now()}
+	app := &App{lastPing: time.Now(), quit: make(chan func() error, 1)}
 	app.loadConfig()
 	go app.fetchManifest()
 
@@ -544,10 +583,32 @@ func main() {
 		openWindow(url)
 	}
 
-	// exit once the window has been closed for a while (the page pings every 2s)
+	// exit once the window has been closed for a while (the page pings every 2s),
+	// or hand over to a freshly downloaded launcher
 	start := time.Now()
 	for {
-		time.Sleep(2 * time.Second)
+		select {
+		case finish := <-app.quit:
+			time.Sleep(700 * time.Millisecond) // let the page get its answer
+			srv.Close()
+			if err := finish(); err != nil {
+				log.Println("self-update swap failed:", err)
+				// couldn't swap; carry on as before
+				ln, lerr := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+				if lerr != nil {
+					return
+				}
+				srv = &http.Server{Handler: app.routes()}
+				go srv.Serve(ln)
+				app.mu.Lock()
+				app.busy = false
+				app.mu.Unlock()
+				continue
+			}
+			log.Println("updated launcher started, exiting")
+			return
+		case <-time.After(2 * time.Second):
+		}
 		app.mu.Lock()
 		idle := time.Since(app.lastPing)
 		busy := app.busy

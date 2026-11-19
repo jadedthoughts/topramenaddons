@@ -67,10 +67,16 @@ func compareVersions(a, b string) int {
 
 const maxZip = 200 << 20
 
-func download(url string) ([]byte, error) {
+func download(url string) ([]byte, error) { return downloadWith(url, false) }
+
+// downloadWith fetches url; api asks GitHub's contents API for the raw file.
+func downloadWith(url string, api bool) ([]byte, error) {
 	client := &http.Client{Timeout: 5 * time.Minute}
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", "TopRamenLauncher/"+Version)
+	if api {
+		req.Header.Set("Accept", "application/vnd.github.raw")
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download failed: %w", err)

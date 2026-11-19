@@ -97,7 +97,13 @@ def main():
         launcher = {
             "version": open(lver_file).read().strip(),
             "url": f"https://github.com/{REPO}/raw/{BRANCH}/releases/TopRamenLauncher.zip",
+            # for the launcher's own "Update launcher" button (1.4.0 and later)
+            "exe": RAW + "releases/TopRamenLauncher.exe",
+            "exeApi": f"https://api.github.com/repos/{REPO}/contents/releases/TopRamenLauncher.exe?ref={BRANCH}",
         }
+        exe = os.path.join(rel_dir, "TopRamenLauncher.exe")
+        if os.path.exists(exe):
+            launcher["sha256"] = sha256(exe)
     # test addons get their own list, so launchers older than 1.1.0 never see them
     manifest = {"schema": 1, "addons": entries, "testAddons": test_entries, "launcher": launcher}
     with open(mpath, "w") as f:

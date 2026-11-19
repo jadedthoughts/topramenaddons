@@ -19,7 +19,7 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 3. The launcher finds your `World of Warcraft\_forever_\Interface\AddOns` folder by itself. If it can't, click **Change…** and pick it.
 4. Click **Install** or **Update** next to each addon, or **Update all**. Then `/reload` in game (restart the game for an addon that's new to you).
 
-Open the launcher whenever you want to check for updates. It doesn't run in the background, and it closes when you close its window.
+Open the launcher whenever you want to check for updates. When a new launcher is out, click **Update launcher** in its window (version 1.4.0 and later) and it replaces itself and reopens. It doesn't run in the background, and it closes when you close its window.
 
 ## Install by hand
 
