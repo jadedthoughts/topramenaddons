@@ -581,6 +581,7 @@ func main() {
 	go srv.Serve(ln)
 	if os.Getenv("TOPRAMEN_NO_WINDOW") == "" {
 		openWindow(url)
+		go brandTaskbar() // our own taskbar button and icon instead of Edge's
 	}
 
 	// exit once the window has been closed for a while (the page pings every 2s),

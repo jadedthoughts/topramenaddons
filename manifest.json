@@ -50,10 +50,10 @@
     }
   ],
   "launcher": {
-    "version": "1.5.0",
+    "version": "1.6.0",
     "url": "https://github.com/jadedthoughts/topramenaddons/raw/main/releases/TopRamenLauncher.zip",
     "exe": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenLauncher.exe",
     "exeApi": "https://api.github.com/repos/jadedthoughts/topramenaddons/contents/releases/TopRamenLauncher.exe?ref=main",
-    "sha256": "aa9102a4ddd8e7573011c7c10d893a3136d79ddc95a8d922f598dbfb449fc77f"
+    "sha256": "642381df196c354b46bce13eb5f1545eb19e34e0a8d6a744d49a3cd3dcd939c3"
   }
 }
