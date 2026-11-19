@@ -453,7 +453,7 @@ func openWindow(url string) {
 	}
 	for _, c := range cands {
 		if _, err := os.Stat(c); err == nil {
-			cmd := exec.Command(c, "--app="+url, "--window-size=840,860",
+			cmd := exec.Command(c, "--app="+url, "--window-size=860,940",
 				"--user-data-dir="+profile, "--no-first-run", "--no-default-browser-check")
 			if cmd.Start() == nil {
 				return

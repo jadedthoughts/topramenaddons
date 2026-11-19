@@ -23,6 +23,8 @@ concurrency: sign-launcher
 
 jobs:
   sign:
+    # skipped until the Azure signing account is connected (see the header)
+    if: vars.SIGNING_ACCOUNT != ''
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
