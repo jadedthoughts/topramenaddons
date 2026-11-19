@@ -13,11 +13,11 @@
     {
       "folder": "TopRamenExplorer",
       "title": "Top Ramen Explorer",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "notes": "/tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.2.0.zip",
-      "size": 83255,
-      "sha256": "e532a0a8ef82ee72d9d466a21eb3dfe9bbcb32bbd085ebe4639ae2a47f418d69"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.2.1.zip",
+      "size": 83619,
+      "sha256": "e4eea0089d8761a14095314ab3564eba3a5ceb474814224ce73c49cfb1edbbec"
     },
     {
       "folder": "TopRamenFarm",
@@ -42,11 +42,11 @@
     {
       "folder": "TopRamenMap",
       "title": "Top Ramen Map",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "notes": "/trmap opens a big live minimap and a whole-dungeon overview with boss pins and routes. /trmap help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.6.0.zip",
-      "size": 72069,
-      "sha256": "0f00e13f7932db35dd85904a5a0e8096d5ecde749f4022d4a892355ff6914ba4"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.6.1.zip",
+      "size": 72433,
+      "sha256": "8bcf0bbdf4b07736b755f6a898deade45367aeefaf947cfb2306c8dc9f469c76"
     }
   ],
   "launcher": {

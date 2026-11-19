@@ -2,7 +2,7 @@
 ## Title: Top Ramen Explorer
 ## Notes: /tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.
 ## Author: Top Ramen
-## Version: 1.2.0
+## Version: 1.2.1
 ## SavedVariables: TopRamenExplorerDB
 ## OptionalDeps: TomTom
 ## IconTexture: Interface\AddOns\TopRamenExplorer\Media\trIcon
