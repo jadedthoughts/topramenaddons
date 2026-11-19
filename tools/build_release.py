@@ -96,7 +96,7 @@ def main():
     if os.path.exists(lver_file):
         launcher = {
             "version": open(lver_file).read().strip(),
-            "url": RAW + "releases/TopRamenLauncher.exe",
+            "url": f"https://github.com/{REPO}/raw/{BRANCH}/releases/TopRamenLauncher.zip",
         }
     # test addons get their own list, so launchers older than 1.1.0 never see them
     manifest = {"schema": 1, "addons": entries, "testAddons": test_entries, "launcher": launcher}

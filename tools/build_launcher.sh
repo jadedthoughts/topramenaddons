@@ -8,3 +8,4 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
   -ldflags "-s -w -H windowsgui -X main.Version=$VER" -o ../releases/TopRamenLauncher.exe .
 cd ..
 ls -la releases/TopRamenLauncher.exe
+(cd releases && rm -f TopRamenLauncher.zip && zip -q -X TopRamenLauncher.zip TopRamenLauncher.exe)
