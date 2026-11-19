@@ -1,0 +1,83 @@
+# Builds TopRamenLauncher.exe on Windows, signs it with Azure Artifact Signing
+# (so Smart App Control and SmartScreen trust it), and commits the signed
+# .exe and .zip back to releases/.
+#
+# Needs, under Settings > Secrets and variables > Actions:
+#   Secrets:   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   Variables: SIGNING_ENDPOINT        e.g. https://eus.codesigning.azure.net/
+#              SIGNING_ACCOUNT         the Artifact Signing account name
+#              SIGNING_PROFILE         the certificate profile name
+name: Sign launcher
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["launcher/**"]
+
+permissions:
+  contents: write   # commit the signed files back
+  id-token: write   # sign in to Azure without a stored password (OIDC)
+
+concurrency: sign-launcher
+
+jobs:
+  sign:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build TopRamenLauncher.exe
+        shell: bash
+        run: |
+          VER=$(cat launcher/VERSION)
+          python tools/make_syso.py launcher/icon.ico launcher/rsrc_windows_amd64.syso
+          mkdir -p out
+          cd launcher
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -H windowsgui -X main.Version=$VER" -o ../out/TopRamenLauncher.exe .
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign with Azure Artifact Signing
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\out
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Check the signature
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature out\TopRamenLauncher.exe
+          $sig | Format-List Status, StatusMessage, SignerCertificate
+          if ($sig.Status -ne 'Valid') { throw "Signature is not valid: $($sig.Status)" }
+
+      - name: Zip, update the version list, and commit
+        shell: bash
+        run: |
+          cp out/TopRamenLauncher.exe releases/TopRamenLauncher.exe
+          python -c "import zipfile; z=zipfile.ZipFile('releases/TopRamenLauncher.zip','w',zipfile.ZIP_DEFLATED); z.write('releases/TopRamenLauncher.exe','TopRamenLauncher.exe'); z.close()"
+          python tools/build_release.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases/TopRamenLauncher.exe releases/TopRamenLauncher.zip manifest.json
+          git commit -m "Signed launcher $(cat launcher/VERSION)" || echo "nothing to commit"
+          git push
