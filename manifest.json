@@ -22,11 +22,11 @@
     {
       "folder": "TopRamenFarm",
       "title": "Top Ramen Farm",
-      "version": "0.1.0",
-      "notes": "/trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenFarm-0.1.0.zip",
-      "size": 63377,
-      "sha256": "4b3f3ea8acd396bd08dcbff91ca8e3da165fc79fbc8e7577cd03d21f74d772bb"
+      "version": "0.2.0",
+      "notes": "/trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done. At a merchant, the Vendor items button sells the items you ticked.",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenFarm-0.2.0.zip",
+      "size": 68377,
+      "sha256": "2008ee31645d3a74e1e677132256e26cb97a944ea4315918563c37e95423f674"
     },
     {
       "folder": "TopRamenGear",

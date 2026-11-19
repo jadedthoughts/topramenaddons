@@ -7,7 +7,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "0.1.0"
+ns.VERSION = "0.2.0"
 ns.AH_CUT = 0.95        -- the auction house keeps 5% of a sale
 local HISTORY_MAX = 50  -- sessions kept per character
 
@@ -342,6 +342,8 @@ local function isQuestSlot(bag, slot)
   return false
 end
 
+ns.NumSlots, ns.slotInfo, ns.isQuestSlot = NumSlots, slotInfo, isQuestSlot -- the vendor button uses these
+
 -- returns { items = { [key] = { id, n, link, bound } }, money = 0, scannedAt, skipped, loading }
 -- Left out: quest items and anything a vendor won't buy. Items still loading stay in until we know.
 function ns.scanBags()
@@ -443,7 +445,9 @@ SlashCmdList.TOPRAMENFARM = function(msg)
     refresh(false)
   elseif cmd == "opacity" then
     if ns.SetOpacity then ns.SetOpacity(msg:match("opacity%s+(%d+)")) end
+  elseif cmd == "vendor" then
+    if ns.VendorPrompt then ns.VendorPrompt() end
   else
-    ns.say("/trfarm opens the window. /trfarm bags opens the My bags tab. /trfarm start, /trfarm stop, /trfarm toggle, /trfarm mini (mini tracker on/off), /trfarm opacity 30-100.")
+    ns.say("/trfarm opens the window. /trfarm bags opens the My bags tab. /trfarm start, /trfarm stop, /trfarm toggle, /trfarm mini (mini tracker on/off), /trfarm opacity 30-100, /trfarm vendor (at a merchant: sell what you ticked on the My bags tab).")
   end
 end

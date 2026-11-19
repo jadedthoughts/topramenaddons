@@ -17,6 +17,48 @@ local bagSnap = nil     -- what's in your bags, re-read on every refresh of the 
 local viewIndex = nil   -- a history session being looked at (nil = current, or the last one)
 local rows = {}
 
+---------------------------------------------------------------------------
+-- sorting: click a column header to sort by it, click it again to flip the order.
+-- Loot and My bags share one setting, History has its own; both are saved.
+---------------------------------------------------------------------------
+local DEFAULT_SORT = { loot = { key = "best", desc = true }, history = { key = "date", desc = true } }
+local TEXT_KEYS = { name = true } -- these start A to Z; every other column starts biggest / newest first
+
+local function sortGroup() return tab == "history" and "history" or "loot" end
+
+local function sortState()
+  local st = ns.settings()
+  st.sort = st.sort or {}
+  local g = sortGroup()
+  if type(st.sort[g]) ~= "table" or not st.sort[g].key then
+    st.sort[g] = { key = DEFAULT_SORT[g].key, desc = DEFAULT_SORT[g].desc }
+  end
+  return st.sort[g]
+end
+
+local function setSort(key)
+  local s = sortState()
+  if s.key == key then s.desc = not s.desc
+  else s.key, s.desc = key, not TEXT_KEYS[key] end
+  ns.Refresh(false)
+end
+
+-- sorts list by valueOf(entry, key). Entries whose value is nil (item still loading) always go last.
+local function sortList(list, valueOf, key, desc, tiebreak)
+  table.sort(list, function(a, b)
+    local x, y = valueOf(a, key), valueOf(b, key)
+    if type(x) == "string" then x = x:lower() end
+    if type(y) == "string" then y = y:lower() end
+    if x ~= y then
+      if x == nil then return false end
+      if y == nil then return true end
+      if desc then return x > y end
+      return x < y
+    end
+    return tiebreak(a, b)
+  end)
+end
+
 local function label(parent, text, font)
   local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlightSmall")
   fs:SetText(text or "")
@@ -142,6 +184,22 @@ local function getRow(i)
   r.stripe:SetColorTexture(C.row[1], C.row[2], C.row[3], 1)
   local hl = r:CreateTexture(nil, "HIGHLIGHT")
   hl:SetAllPoints(); hl:SetColorTexture(1, 0.82, 0, 0.08)
+  -- My bags tab: tick an item to sell it with Vendor items (unticked by default)
+  r.check = CreateFrame("CheckButton", nil, r, "UICheckButtonTemplate")
+  r.check:SetSize(22, 22)
+  r.check:SetPoint("LEFT", 2, 0)
+  r.check:SetScript("OnClick", function(self)
+    ns.setVendorPick(self.id, self:GetChecked())
+    ns.Refresh(false)
+  end)
+  r.check:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:AddLine("Sell with Vendor items")
+    GameTooltip:AddLine("Ticked items are sold when you click Vendor items at a merchant. The tick clears once the item is sold.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  r.check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  r.check:Hide()
   r.icon = r:CreateTexture(nil, "ARTWORK")
   r.icon:SetSize(18, 18)
   r.icon:SetPoint("LEFT", 4, 0)
@@ -180,6 +238,19 @@ local function sellToText(v)
   return HX.dim .. "no value|r"
 end
 
+local function lootSortValue(e, key)
+  if key == "name" then return e.name end
+  if key == "qty" then return e.n end
+  local v = e.value
+  if not v then return nil end
+  if key == "vEach" then return v.vendor
+  elseif key == "vTot" then return v.vendor * e.n
+  elseif key == "aEach" then return v.ahNet or -1
+  elseif key == "to" then return (v.sellTo == "ah" and 2) or (v.sellTo == "vendor" and 1) or 0
+  end
+  return v.best * e.n -- "best"
+end
+
 local function fillLoot(s)
   local list = {}
   if s and (s.money or 0) > 0 then
@@ -194,17 +265,33 @@ local function fillLoot(s)
       sortKey = v and v.best * (it.n or 0) or -1, name = v and v.name or ("item " .. id) }
     end
   end
-  table.sort(items, function(a, b)
-    if a.sortKey ~= b.sortKey then return a.sortKey > b.sortKey end
-    return a.name < b.name
+  local srt = sortState()
+  sortList(items, lootSortValue, srt.key, srt.desc, function(a, b)
+    if a.name ~= b.name then return a.name < b.name end
+    return a.id < b.id
   end)
-  for _, e in ipairs(items) do list[#list + 1] = e end
+  for _, e in ipairs(items) do list[#list + 1] = e end -- coin looted always stays on top
   return list
+end
+
+local function histSortValue(e, key)
+  local s, snap = e.session, e.snap
+  if key == "dur" then return s.elapsed or 0
+  elseif key == "gold" then return snap.money or 0
+  elseif key == "vend" then return snap.vendor or 0
+  elseif key == "smart" then return snap.smart or 0
+  elseif key == "hr" then return ns.perHour(snap.smart, s.elapsed) or -1
+  end
+  return s.startedAt or 0 -- "date"
 end
 
 local function fillHistory()
   local list = {}
-  for i, s in ipairs(ns.char().history) do list[#list + 1] = { kind = "history", index = i, session = s } end
+  for i, s in ipairs(ns.char().history) do
+    list[#list + 1] = { kind = "history", index = i, session = s, snap = s.snap or ns.totals(s) }
+  end
+  local srt = sortState()
+  sortList(list, histSortValue, srt.key, srt.desc, function(a, b) return a.index < b.index end)
   return list
 end
 
@@ -219,6 +306,11 @@ local function drawRows(list)
     r:SetWidth(width)
     r.stripe:SetShown(i % 2 == 0)
     for c = 1, MAX_CELLS do r.cells[c]:SetText("") end
+    local showCheck = tab == "bags" and d.kind == "item" and d.value ~= nil
+    r.check:SetShown(showCheck)
+    if showCheck then r.check.id = d.id; r.check:SetChecked(ns.isVendorPick(d.id) and true or false) end
+    local pad = tab == "bags" and 24 or 0 -- room for the checkbox
+    r.icon:SetPoint("LEFT", 4 + pad, 0)
     if d.kind == "history" then
       r.icon:Hide()
       layoutCells(r, r.cells, r.left, cols, 8)
@@ -234,7 +326,7 @@ local function drawRows(list)
       r.cells[1]:SetText(hr and ns.money(hr, false, true) or HX.dim .. "-|r")
     else
       r.icon:Show()
-      layoutCells(r, r.cells, r.left, cols, 28)
+      layoutCells(r, r.cells, r.left, cols, 28 + pad)
       if d.kind == "money" then
         r.icon:SetTexture("Interface\\Icons\\INV_Misc_Coin_01")
         r.left:SetText(HX.gold .. "Coin looted|r")
@@ -365,14 +457,64 @@ function ns.Refresh(full)
   updateBoxes()
   for name, b in pairs(W.tabs) do if name == tab then b:LockHighlight() else b:UnlockHighlight() end end
   local cols = tab == "history" and HIST_COLS or LOOT_COLS
-  layoutCells(W.header, W.headerCells, W.headerLeft, cols, tab == "history" and 8 or 28)
-  for i = 1, MAX_CELLS do W.headerCells[i]:SetText(cols[i] and (HX.muted .. cols[i].title .. "|r") or "") end
+  layoutCells(W.header, W.headerCells, W.headerLeft, cols, tab == "history" and 8 or (tab == "bags" and 52 or 28))
+  -- column names: the one you're sorting by is gold with an arrow showing the direction
+  local srt = sortState()
+  local function headText(title, key)
+    if srt.key ~= key then return HX.muted .. title .. "|r" end
+    return HX.gold .. title .. "|r |TInterface\\Buttons\\" .. (srt.desc and "Arrow-Down-Up" or "Arrow-Up-Up") .. ":12:12:0:-3|t"
+  end
+  for i = 1, MAX_CELLS do
+    local col, btn = cols[i], W.headerBtns[i]
+    W.headerCells[i]:SetText(col and headText(col.title, col.key) or "")
+    btn.key, btn.title = col and col.key, col and col.title
+    btn:SetShown(col ~= nil)
+  end
+  local leftKey, leftTitle = tab == "history" and "date" or "name", tab == "history" and "Session" or "Item"
+  W.headerLeft:SetText(headText(leftTitle, leftKey))
+  W.headerLeftBtn.key, W.headerLeftBtn.title = leftKey, leftTitle
   local s, mode = shown()
-  W.headerLeft:SetText(HX.muted .. (tab == "history" and "Session" or "Item") .. "|r")
   W.back:SetShown(mode == "history" and tab == "loot")
   W.clearHist:SetShown(tab == "history" and #ns.char().history > 0)
+  -- Vendor items: shown while you're talking to a merchant
+  local atMerchant, selling = false, false
+  if ns.VendorStatus then atMerchant, selling = ns.VendorStatus() end
+  W.vendor:SetShown(atMerchant)
+  if atMerchant then
+    if selling then
+      W.vendor:SetText("Selling..."); W.vendor:Disable()
+    else
+      local n = #ns.vendorList()
+      W.vendor:SetText("Vendor items" .. (n > 0 and (" (" .. n .. ")") or ""))
+      if n > 0 then W.vendor:Enable() else W.vendor:Disable() end
+    end
+  end
+  -- footer buttons line up from the bottom-left corner; the price note takes the rest
+  local fx = 12
+  for _, b in ipairs({ W.vendor, W.back, W.clearHist }) do
+    if b:IsShown() then
+      b:ClearAllPoints(); b:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", fx, 12)
+      fx = fx + b:GetWidth() + 6
+    end
+  end
+  W.prices:ClearAllPoints()
+  W.prices:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -28, 19)
+  W.prices:SetPoint("LEFT", frame, "BOTTOMLEFT", math.max(170, fx + 10), 0)
   local list = tab == "history" and fillHistory() or fillLoot(s)
   drawRows(list)
+  -- the header box ticks / clears every item in the My bags list
+  local ids, allTicked = {}, true
+  if tab == "bags" then
+    for _, d in ipairs(list) do
+      if d.kind == "item" and d.value then
+        ids[#ids + 1] = d.id
+        if not ns.isVendorPick(d.id) then allTicked = false end
+      end
+    end
+  end
+  W.checkAll.ids = ids
+  W.checkAll:SetShown(#ids > 0)
+  W.checkAll:SetChecked(#ids > 0 and allTicked)
   if #list == 0 then
     W.empty:SetText(tab == "history" and (HX.muted .. "No saved sessions yet. Stop a farm run and it lands here.|r")
       or tab == "bags" and (HX.muted .. "Nothing in your bags that a vendor will buy.|r")
@@ -529,6 +671,43 @@ local function build()
   W.headerLeft = label(W.header, "")
   W.headerCells = {}
   for i = 1, MAX_CELLS do W.headerCells[i] = label(W.header, "") end
+  -- a clickable area over each column name; clicking sorts by that column
+  local function headerButton(fs)
+    local b = CreateFrame("Button", nil, W.header)
+    b:SetPoint("TOPLEFT", fs, "TOPLEFT", -4, 5)
+    b:SetPoint("BOTTOMRIGHT", fs, "BOTTOMRIGHT", 4, -5)
+    local h = b:CreateTexture(nil, "HIGHLIGHT")
+    h:SetAllPoints(); h:SetColorTexture(1, 0.82, 0, 0.08)
+    b:SetScript("OnClick", function(self) if self.key then setSort(self.key) end end)
+    b:SetScript("OnEnter", function(self)
+      if not self.key then return end
+      GameTooltip:SetOwner(self, "ANCHOR_TOP")
+      GameTooltip:AddLine("Sort by " .. (self.title or ""))
+      GameTooltip:AddLine("Click again to flip the order.", 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+  end
+  W.headerLeftBtn = headerButton(W.headerLeft)
+  W.checkAll = CreateFrame("CheckButton", nil, W.header, "UICheckButtonTemplate")
+  W.checkAll:SetSize(22, 22)
+  W.checkAll:SetPoint("LEFT", W.header, "LEFT", 2, 0)
+  W.checkAll:SetScript("OnClick", function(self)
+    local on = self:GetChecked() and true or false
+    for _, id in ipairs(self.ids or {}) do ns.setVendorPick(id, on) end
+    ns.Refresh(false)
+  end)
+  W.checkAll:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine(self:GetChecked() and "Untick everything" or "Tick everything")
+    GameTooltip:AddLine("Ticks or clears every item in this list for Vendor items.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  W.checkAll:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  W.checkAll:Hide()
+  W.headerBtns = {}
+  for i = 1, MAX_CELLS do W.headerBtns[i] = headerButton(W.headerCells[i]) end
   local hl = frame:CreateTexture(nil, "ARTWORK")
   hl:SetColorTexture(1, 0.82, 0, 0.25); hl:SetHeight(1)
   hl:SetPoint("TOPLEFT", well, "TOPLEFT", 6, -24); hl:SetPoint("TOPRIGHT", well, "TOPRIGHT", -6, -24)
@@ -560,6 +739,12 @@ local function build()
     StaticPopup_Show("TOPRAMENFARM_CLEAR")
   end)
   W.clearHist:SetPoint("BOTTOMLEFT", 12, 12)
+  W.vendor = UI.Button(frame, 170, 24, "Vendor items", function() if ns.VendorPrompt then ns.VendorPrompt() end end)
+  W.vendor:SetPoint("BOTTOMLEFT", 12, 12)
+  if W.vendor.SetMotionScriptsWhileDisabled then W.vendor:SetMotionScriptsWhileDisabled(true) end
+  W.vendor:HookScript("OnEnter", function(self) if ns.VendorTooltip then ns.VendorTooltip(self) end end)
+  W.vendor:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  W.vendor:Hide()
   W.prices = label(frame, "")
   W.prices:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -28, 19)
   W.prices:SetPoint("LEFT", frame, "BOTTOMLEFT", 170, 0)

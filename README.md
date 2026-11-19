@@ -7,7 +7,7 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 | Top Ramen Gear | `/trg` | Gear window for your class, by spec: best gear in your bags, a hunt list for upcoming dungeon drops, and upgrade comparisons with other addon users |
 | Top Ramen Crafting | `/trc` | Crafting planner: what to craft to level up, what makes money, what to buy |
 | Top Ramen Explorer | `/tre` | Finds the spots you still need for the Adventure > Explorer achievements |
-| Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house |
+| Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house, sortable columns, and a Vendor items button that sells the items you tick |
 | Top Ramen Map *(test)* | `/trmap` | Big live minimap and whole-dungeon overview. Needs the Forever Dungeon Journal addon for its map images |
 
 **Test addons** are still being worked on. They only appear in the launcher when you tick **Show test addons** at the bottom of its window.

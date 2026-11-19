@@ -120,6 +120,8 @@ end
 function UI.Window(name, alpha)
   local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
   UI.Skin(f, C.bg, C.trim, 2, alpha or 0.97)
+  -- comes to the front when opened or clicked (not the Map window: it carries the minimap and sets its own layer)
+  if not (name and name:find("Map")) then UI.RegisterWindow(f) end
   return f
 end
 
@@ -175,4 +177,23 @@ function UI.Panel(parent, bg, border)
   edge("TOPLEFT", "TOPRIGHT", true); edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
   edge("TOPLEFT", "BOTTOMLEFT", false); edge("TOPRIGHT", "BOTTOMRIGHT", false)
   return fill
+end
+
+-- Top Ramen windows share one list (every Top Ramen addon adds its windows): the one you opened or clicked
+-- last is drawn on the "HIGH" layer and the others drop to "MEDIUM", so two windows never mix their parts.
+local stack = _G.TopRamenWindows or {}
+_G.TopRamenWindows = stack
+function UI.BringToFront(f)
+  for _, w in ipairs(stack) do
+    if w ~= f and w.SetFrameStrata then w:SetFrameStrata("MEDIUM") end
+  end
+  f:SetFrameStrata("HIGH")
+  if f.Raise then f:Raise() end
+end
+function UI.RegisterWindow(f)
+  for _, w in ipairs(stack) do if w == f then return end end
+  stack[#stack + 1] = f
+  if f.SetToplevel then f:SetToplevel(true) end
+  f:HookScript("OnShow", function(self) UI.BringToFront(self) end)
+  f:HookScript("OnMouseDown", function(self) UI.BringToFront(self) end)
 end
