@@ -286,6 +286,7 @@ local function getRow(i)
     GameTooltip:Show()
   end)
   row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  row:SetScript("OnClick", function(self) if self.OnRowClick then self.OnRowClick() end end)
   rows[i] = row
   return row
 end
@@ -293,7 +294,7 @@ end
 local function setRow(i, layoutName, values, itemID, step, extra, check)
   local row = getRow(i)
   row.extra = extra
-  row.open:Hide(); row.OnOpen = nil
+  row.open:Hide(); row.OnOpen = nil; row.OnRowClick = nil
   if check then
     row.check:SetChecked(check.checked)
     row.OnCheck = check.fn
@@ -612,9 +613,52 @@ local function renderGuild(n)
 
   W.fresh:SetText((IsInGuild and IsInGuild()) and "" or (WARN .. "You're not in a guild. Links people send you still show below.|r"))
   W.summary:SetText(("%d profession entries in the guild    %d recipe lists known    %d saved links\n%s"):format(people, recordedCount, linkedCount,
-    DIM .. "Open shows an online guildmate's profession window; their skill and recipes are then saved for Who can make.|r"))
+    DIM .. "Click a profession to fold it. Open shows an online guildmate's profession and saves their recipes.|r"))
+
+  -- everyone we know about, grouped by profession: the guild list, then people who linked a profession
+  local groups, seen = {}, {}
+  if dir then
+    local profNames = {}
+    for prof in pairs(dir.profs) do profNames[#profNames + 1] = prof end
+    table.sort(profNames)
+    for _, prof in ipairs(profNames) do
+      local list = {}
+      for _, m in ipairs(dir.profs[prof]) do
+        list[#list + 1] = { who = m.name, prof = prof, on = isOnline(m.name, m.online) }
+        seen[nameKey(m.name) .. "|" .. prof:lower()] = true
+      end
+      groups[#groups + 1] = { key = prof, title = prof, people = list, counts = true }
+    end
+  end
+  local others = {}
+  for _, t in ipairs({ known, links }) do
+    for who, profs in pairs(t) do
+      for prof in pairs(profs) do
+        local k = nameKey(who) .. "|" .. prof:lower()
+        if not seen[k] then seen[k] = true; others[#others + 1] = { who = who, prof = prof, on = isOnline(who, false) } end
+      end
+    end
+  end
+  if #others > 0 then
+    groups[#groups + 1] = { key = "_others", title = dir and "Others who linked a profession" or "Profession links you've seen", people = others }
+  end
+  local function byOnline(a, b)
+    if a.on ~= b.on then return a.on end
+    if a.who ~= b.who then return a.who < b.who end
+    return a.prof < b.prof
+  end
 
   if q ~= "" then
+    -- guildmates whose name matches
+    local people = {}
+    for _, g in ipairs(groups) do
+      for _, x in ipairs(g.people) do if x.who:lower():find(q, 1, true) then people[#people + 1] = x end end
+    end
+    table.sort(people, function(a, b) if a.who ~= b.who then return a.who < b.who end return a.prof < b.prof end)
+    if #people > 0 then
+      line(GOLD .. "Guildmates matching \"" .. q .. "\"|r")
+      for _, x in ipairs(people) do personRow(x.who, x.prof, x.on) end
+    end
     -- who can make it: search every recipe list we've recorded
     local byRecipe, names = {}, {}
     for who, profs in pairs(known) do
@@ -628,54 +672,35 @@ local function renderGuild(n)
       end
     end
     table.sort(names)
-    if #names == 0 then
-      line(DIM .. "No known recipe matches \"" .. q .. "\".|r")
-      line(DIM .. "Only recipe lists from profession links people have sent are searchable. Ask them to link their profession in chat.|r")
+    if #names == 0 and #people == 0 then
+      line(DIM .. "No guildmate or known recipe matches \"" .. q .. "\".|r")
+      line(DIM .. "Recipes are searchable once a guildmate's profession has been opened (Open, or a link they send).|r")
     end
     for i, rname in ipairs(names) do
       if i > 60 then line(DIM .. (#names - 60) .. " more recipes match. Type more of the name.|r"); break end
       line(GOLD .. rname .. "|r")
       local list = byRecipe[rname]
       for _, x in ipairs(list) do x.on = isOnline(x.who, false) end
-      table.sort(list, function(a, b) if a.on ~= b.on then return a.on end return a.who < b.who end)
+      table.sort(list, byOnline)
       for _, x in ipairs(list) do personRow(x.who, x.prof, x.on) end
     end
     return n
   end
 
-  -- the directory: every profession, online people first
-  local seen = {}
-  if dir then
-    local profNames = {}
-    for prof in pairs(dir.profs) do profNames[#profNames + 1] = prof end
-    table.sort(profNames)
-    for _, prof in ipairs(profNames) do
-      local list = {}
-      for _, m in ipairs(dir.profs[prof]) do
-        list[#list + 1] = { who = m.name, on = isOnline(m.name, m.online) }
-        seen[nameKey(m.name) .. "|" .. prof:lower()] = true
-      end
-      table.sort(list, function(a, b) if a.on ~= b.on then return a.on end return a.who < b.who end)
-      local on = 0
-      for _, x in ipairs(list) do if x.on then on = on + 1 end end
-      line(GOLD .. prof .. "|r" .. DIM .. "   " .. #list .. " in the guild, " .. on .. " online|r")
-      for _, x in ipairs(list) do personRow(x.who, prof, x.on) end
+  -- the directory: click a profession to fold or unfold it
+  local folded = settings().guildFolded or {}
+  settings().guildFolded = folded
+  for _, g in ipairs(groups) do
+    table.sort(g.people, byOnline)
+    local on = 0
+    for _, x in ipairs(g.people) do if x.on then on = on + 1 end end
+    local closed = folded[g.key]
+    line((closed and "|cff8f8f8f[+]|r " or "|cff8f8f8f[-]|r ") .. GOLD .. g.title .. "|r" ..
+      DIM .. "   " .. #g.people .. (g.counts and " in the guild, " or " people, ") .. on .. " online|r")
+    rows[n].OnRowClick = function() folded[g.key] = (not folded[g.key]) or nil; ns.RefreshWindow() end
+    if not closed then
+      for _, x in ipairs(g.people) do personRow(x.who, x.prof, x.on) end
     end
-  end
-  -- people we know about from links who aren't in the guild list
-  local others = {}
-  for _, t in ipairs({ known, links }) do
-    for who, profs in pairs(t) do
-      for prof in pairs(profs) do
-        local k = nameKey(who) .. "|" .. prof:lower()
-        if not seen[k] then seen[k] = true; others[#others + 1] = { who = who, prof = prof, on = isOnline(who, false) } end
-      end
-    end
-  end
-  if #others > 0 then
-    table.sort(others, function(a, b) if a.who ~= b.who then return a.who < b.who end return a.prof < b.prof end)
-    line(GOLD .. (dir and "Others who linked a profession" or "Profession links you've seen") .. "|r")
-    for _, x in ipairs(others) do personRow(x.who, x.prof, x.on) end
   end
   if not dir and #others == 0 then line(DIM .. "Nothing yet. Open the guild list with Refresh guild list, or ask someone to link a profession in chat.|r") end
   return n
@@ -717,6 +742,27 @@ local function isReagent(id, used)
   if C_Item and C_Item.GetItemInfoInstant then classID = select(6, C_Item.GetItemInfoInstant(id))
   elseif GetItemInfoInstant then classID = select(6, GetItemInfoInstant(id)) end
   return classID == 5 or classID == 7 -- Reagent, Trade Goods
+end
+
+-- show an item on the auction window's own buy screen, quantity filled in where the game allows
+function ns.ShowInAH(id, qty)
+  local f, a = AuctionHouseFrame, C_AuctionHouse
+  if not (f and f:IsShown() and a) then ns.say("open the auction house first."); return false end
+  local name = (GetItemInfo and GetItemInfo(id)) or ("item " .. id)
+  local opened = pcall(function()
+    if AuctionHouseFrameDisplayMode and f.SetDisplayMode then f:SetDisplayMode(AuctionHouseFrameDisplayMode.Buy) end
+    f:SelectBrowseResult({ itemKey = a.MakeItemKey(id) })
+  end)
+  if not opened and f.SearchBar then pcall(function() f.SearchBar:SetSearchText(name); f.SearchBar:StartSearch() end) end
+  local function setQty()
+    pcall(function()
+      local cb = f.CommoditiesBuyFrame
+      local bd = cb and (cb.GetBuyDisplay and cb:GetBuyDisplay() or cb.BuyDisplay)
+      if bd and bd.SetQuantitySelected and qty then bd:SetQuantitySelected(qty) end
+    end)
+  end
+  if C_Timer then C_Timer.After(0.6, setQty) else setQty() end
+  return true
 end
 
 -- one item's flip from its scanned price levels: the listings below what a vendor pays
@@ -1103,11 +1149,10 @@ local function render()
   for i = n + 1, #rows do rows[i]:Hide() end
   W.content:SetHeight(math.max(1, n * ROW_H))
   if tab == "shop" then
-    W.clearPicks:Show(); W.openShop:Show()
-    if ns.Prices and ns.Prices.isAHOpen() then W.openShop:Enable() else W.openShop:Disable() end
+    W.clearPicks:Show()
     if ns.auctionator() then W.createList:Show() else W.createList:Hide() end
   else
-    W.createList:Hide(); W.clearPicks:Hide(); W.openShop:Hide()
+    W.createList:Hide(); W.clearPicks:Hide()
   end
   if tab == "flips" then W.flipReagents:SetChecked(settings().flipReagents and true or false); W.flipReagents:Show() else W.flipReagents:Hide() end
   if tab == "money" then W.maxMake:Show(); W.resetMake:Show(); W.bestMake:Show()
@@ -1334,7 +1379,7 @@ local function build()
   -- tabs
   W.tabs = {}
   local prev
-  for _, t in ipairs({ { "plan", "Skill-up plan" }, { "money", "Money makers" }, { "shop", "Shopping list" }, { "guild", "Guild" }, { "flips", "Vendor flips" } }) do
+  for _, t in ipairs({ { "plan", "Skill-up plan" }, { "money", "Money makers" }, { "shop", "Shopping list" }, { "flips", "Vendor flips" }, { "guild", "Guild" } }) do
     local b = button(frame, t[2], 140, 28, function() tab = t[1]; ns.RefreshWindow() end)
     if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", 14, -222) end
     W.tabs[t[1]] = b
@@ -1377,16 +1422,6 @@ local function build()
     ns.RefreshWindow()
   end)
   W.clearPicks:SetPoint("BOTTOMLEFT", 14, 12)
-  -- buy the list at the auction house with Top Ramen's own shopping panel
-  W.openShop = button(frame, "Shopping panel", 140, 26, function() if ns.ShowShopPanel then ns.ShowShopPanel() end end)
-  W.openShop:SetPoint("LEFT", W.clearPicks, "RIGHT", 8, 0)
-  W.openShop:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:AddLine("Shopping panel")
-    GameTooltip:AddLine("Opens beside the auction house: click a material, check the price, Buy Now, Confirm. It opens by itself when you visit the auction house.", 1, 1, 1, true)
-    GameTooltip:Show()
-  end)
-  W.openShop:SetScript("OnLeave", function() GameTooltip:Hide() end)
   -- Guild tab: refresh the guild's profession list, and a recipe search
   -- works like the AH Database box: click to read again; shows when it was last read, how fresh, and progress
   do
@@ -1442,7 +1477,14 @@ local function build()
   W.guildSearch:SetScript("OnTextChanged", function() ns.RefreshWindow() end)
   W.guildSearch:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
   W.guildSearch:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-  W.guildSearchLabel = label(frame, "Who can make", "GameFontHighlightSmall")
+  W.guildSearch:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine("Search")
+    GameTooltip:AddLine("Type part of a guildmate's name to find them, or part of a recipe or item name to see who can make it.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  W.guildSearch:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  W.guildSearchLabel = label(frame, "Name or recipe", "GameFontHighlightSmall")
   W.guildSearchLabel:SetPoint("RIGHT", W.guildSearch, "LEFT", -10, 0)
   W.guildRefresh:Hide(); W.guildSearch:Hide(); W.guildSearchLabel:Hide()
   -- Vendor flips: reagents only
@@ -1509,7 +1551,7 @@ local function build()
   W.maxMake:Hide()
   -- Auctionator's list, only if Auctionator is installed
   W.createList:ClearAllPoints()
-  W.createList:SetPoint("LEFT", W.openShop, "RIGHT", 8, 0)
+  W.createList:SetPoint("LEFT", W.clearPicks, "RIGHT", 8, 0)
 end
 
 -- background opacity, 0.3 - 1.0 (saved). The profession window is roughly 0.92.

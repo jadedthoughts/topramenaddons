@@ -1300,9 +1300,6 @@ local function craftCommand(msg)
   elseif cmd == "export" or cmd == "craft" then
     runExport(1)
     return true
-  elseif cmd == "shop" then
-    if ns.ShowShopPanel then ns.ShowShopPanel() end
-    return true
   elseif cmd == "opacity" then
     if ns.SetOpacity then ns.SetOpacity((msg or ""):match("opacity%s+(%d+)")) end
     return true

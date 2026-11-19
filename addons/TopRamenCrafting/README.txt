@@ -41,12 +41,12 @@ TABS
   from your last scan, with the profit if you buy those listings and vendor them. With
   the auction house open, Open shows the item in the auction window. Cheap listings sell
   fast, so run a Full scan right before.
-  Tick items to add them to the Shopping list under "Vendor flips"; the Shopping panel
-  then buys only listings below what a vendor pays. "Reagents only" narrows the list.
+  Tick items to add them to the Shopping list under "Vendor flips"; the Auctionator
+  list caps their price so only listings below what a vendor pays show. "Reagents only" narrows the list.
 - Guild: every profession in your guild and who has it, online people first (offline
   members included). When someone links a profession in chat, the addon saves the link
-  and, once you open it, their skill and recipe list. "Who can make" searches those
-  recipe lists. Open (online guildmates only; the game won't open an offline
+  and, once you open it, their skill and recipe list. The search box finds a
+  guildmate by name, or who can make a recipe. Click a profession heading to fold it. Open (online guildmates only; the game won't open an offline
   person's profession) shows their profession window: it reopens a saved link, or builds
   one from their guild roster entry (Link column "can build") without them linking it.
   Built links only open for guildmates whose character ID has the same server number
@@ -56,18 +56,10 @@ TABS
   minutes, yellow ? within a day, red X older. Click it to read the list again.
 
 BUYING AT THE AUCTION HOUSE
-The shopping panel opens beside the auction house by itself (or: Shopping panel button,
-or /trc shop). It lists the auction house items from your Shopping list.
-1. Click a material: it searches the auction house and fills in the amount you need.
-2. Check the quantity, unit price, total and the price levels it will buy from
-   (highlighted). Change the quantity if you like.
-3. Click Buy Now: the game quotes the exact total.
-4. Click Confirm. The material shows "done" once you have enough.
-   If Buy Now doesn't go through, click Open in AH: the item opens on the auction
-   house's own buy screen (quantity filled in where possible) to buy it there.
-It warns you when prices are well above your last scan or you're short of gold.
-When only part of what you need is at a good price (within 25% of the cheapest
-listing), an "Only N" button sets the quantity to just that part.
+Buying goes through Auctionator. On the Shopping list tab, click "Create Auctionator
+list": it makes an Auctionator shopping list with every auction house item and the
+amount to buy (vendor flips carry a price cap so only profitable listings show).
+At the auction house, open Auctionator's Shopping tab and search that list.
 
 PRICES BY QUANTITY
 Scans save each item's price levels (how many are listed at each price), so the
@@ -92,7 +84,6 @@ re-reads your bags, bank and prices and marks every profession for re-reading.
 COMMANDS (/trc and /topramencraft work the same)
 /trc                 open or close the planner
 /trc opacity 85      window background opacity, 30-100 (default 92)
-/trc shop            open the auction house shopping panel
 /trc reset           move the window back to the center at its default size
 /trc export          text snapshot of your recipes and prices (for troubleshooting)
 /trc debug           what the addon can see

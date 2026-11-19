@@ -4,11 +4,11 @@
     {
       "folder": "TopRamenCrafting",
       "title": "Top Ramen Crafting",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "notes": "/topramencraft (or /trc) opens the crafting planner: what to craft to level up, what makes money, and what to buy, with prices from its own auction house scan (Auctionator optional).",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenCrafting-2.3.0.zip",
-      "size": 110921,
-      "sha256": "59a0e505f9fba2bae5d3d8fc5985830e226c4e2d696a95c5f67df45b11be2559"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenCrafting-2.4.0.zip",
+      "size": 103800,
+      "sha256": "f9a8d6d0cdd5116aeee2277fba9c8f5725dec9c8fc85c1ad3a6a944b8966e609"
     },
     {
       "folder": "TopRamenExplorer",
