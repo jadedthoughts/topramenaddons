@@ -8,6 +8,9 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 | Top Ramen Crafting | `/trc` | Crafting planner: what to craft to level up, what makes money, what to buy |
 | Top Ramen Explorer | `/tre` | Finds the spots you still need for the Adventure > Explorer achievements |
 | Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house |
+| Top Ramen Map *(test)* | `/trmap` | Big live minimap and whole-dungeon overview. Needs the Forever Dungeon Journal addon for its map images |
+
+**Test addons** are still being worked on. They only appear in the launcher when you tick **Show test addons** at the bottom of its window.
 
 ## Install with the launcher (easiest)
 
@@ -27,6 +30,8 @@ Download an addon's zip from [`releases/`](releases/) and unzip it into `World o
 1. Copy the changed addon folder into `addons/` and raise `## Version:` in its `.toc`.
 2. Run `python3 tools/build_release.py`. This builds `releases/<Addon>-<version>.zip` and updates `manifest.json`, which is what the launcher reads.
 3. Commit and push. Launchers see the new version within a few minutes.
+
+**Test or released?** `channels.json` lists the addons that are still in testing. Only people who tick "Show test addons" see those. To release one to everyone, remove its name from that list and run the build again.
 
 To rebuild the launcher: raise `launcher/VERSION`, run `sh tools/build_launcher.sh` (needs Go), then `python3 tools/build_release.py`, and push. Older launchers will show a "new launcher available" notice.
 

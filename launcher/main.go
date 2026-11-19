@@ -38,6 +38,7 @@ var webFS embed.FS
 
 type Config struct {
 	AddOnsPath string `json:"addonsPath"`
+	ShowTest   bool   `json:"showTest"`
 }
 
 type ManifestAddon struct {
@@ -51,9 +52,10 @@ type ManifestAddon struct {
 }
 
 type Manifest struct {
-	Schema   int             `json:"schema"`
-	Addons   []ManifestAddon `json:"addons"`
-	Launcher struct {
+	Schema     int             `json:"schema"`
+	Addons     []ManifestAddon `json:"addons"`
+	TestAddons []ManifestAddon `json:"testAddons"`
+	Launcher   struct {
 		Version string `json:"version"`
 		URL     string `json:"url"`
 	} `json:"launcher"`
@@ -66,12 +68,15 @@ type AddonState struct {
 	Installed string `json:"installed"` // "" when not installed
 	Latest    string `json:"latest"`
 	Status    string `json:"status"` // missing | update | current | newer
+	Test      bool   `json:"test"`
 }
 
 type State struct {
 	LauncherVersion string       `json:"launcherVersion"`
 	AddOnsPath      string       `json:"addonsPath"`
 	PathOK          bool         `json:"pathOk"`
+	ShowTest        bool         `json:"showTest"`
+	TestCount       int          `json:"testCount"`
 	ManifestError   string       `json:"manifestError,omitempty"`
 	CheckedAt       string       `json:"checkedAt,omitempty"`
 	Addons          []AddonState `json:"addons"`
@@ -211,7 +216,7 @@ func (a *App) fetchManifest() {
 func (a *App) state() State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	s := State{LauncherVersion: Version, AddOnsPath: a.cfg.AddOnsPath, PathOK: isAddOnsDir(a.cfg.AddOnsPath)}
+	s := State{LauncherVersion: Version, AddOnsPath: a.cfg.AddOnsPath, PathOK: isAddOnsDir(a.cfg.AddOnsPath), ShowTest: a.cfg.ShowTest}
 	if !a.checkedAt.IsZero() {
 		s.CheckedAt = a.checkedAt.Format("3:04 PM")
 	}
@@ -225,8 +230,13 @@ func (a *App) state() State {
 	if l := a.manifest.Launcher; l.Version != "" && Version != "dev" && compareVersions(l.Version, Version) > 0 {
 		s.LauncherUpdate, s.LauncherURL = l.Version, l.URL
 	}
-	for _, m := range a.manifest.Addons {
-		st := AddonState{Folder: m.Folder, Title: m.Title, Notes: m.Notes, Latest: m.Version}
+	s.TestCount = len(a.manifest.TestAddons)
+	list := a.manifest.Addons
+	if a.cfg.ShowTest {
+		list = append(append([]ManifestAddon{}, list...), a.manifest.TestAddons...)
+	}
+	for k, m := range list {
+		st := AddonState{Folder: m.Folder, Title: m.Title, Notes: m.Notes, Latest: m.Version, Test: k >= len(a.manifest.Addons)}
 		if s.PathOK {
 			st.Installed = installedVersion(filepath.Join(a.cfg.AddOnsPath, m.Folder))
 		}
@@ -242,7 +252,12 @@ func (a *App) state() State {
 		}
 		s.Addons = append(s.Addons, st)
 	}
-	sort.SliceStable(s.Addons, func(i, j int) bool { return s.Addons[i].Title < s.Addons[j].Title })
+	sort.SliceStable(s.Addons, func(i, j int) bool {
+		if s.Addons[i].Test != s.Addons[j].Test {
+			return !s.Addons[i].Test // test addons go last
+		}
+		return s.Addons[i].Title < s.Addons[j].Title
+	})
 	return s
 }
 
@@ -313,6 +328,21 @@ func (a *App) routes() http.Handler {
 		a.mu.Unlock()
 		writeJSON(w, map[string]any{"ok": true, "state": a.state()})
 	})
+	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "POST only", 405)
+			return
+		}
+		var body struct {
+			ShowTest bool `json:"showTest"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		a.mu.Lock()
+		a.cfg.ShowTest = body.ShowTest
+		a.saveConfig()
+		a.mu.Unlock()
+		writeJSON(w, a.state())
+	})
 	mux.HandleFunc("/api/install", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			http.Error(w, "POST only", 405)
@@ -382,9 +412,11 @@ func (a *App) install(folders []string) map[string]any {
 	var results []InstallResult
 	for _, f := range folders {
 		var entry *ManifestAddon
-		for i := range m.Addons {
-			if m.Addons[i].Folder == f {
-				entry = &m.Addons[i]
+		for _, list := range [][]ManifestAddon{m.Addons, m.TestAddons} {
+			for i := range list {
+				if list[i].Folder == f {
+					entry = &list[i]
+				}
 			}
 		}
 		if entry == nil {

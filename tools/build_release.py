@@ -3,6 +3,9 @@
 
 Run from the repository root:  python3 tools/build_release.py
 
+Addons named under "test" in channels.json go in a separate testAddons list,
+shown only when the player ticks "Show test addons" in the launcher.
+
 For every folder in addons/ it reads "## Version:" from the .toc, writes
 releases/<Addon>-<version>.zip (with the addon folder at the top of the zip,
 like any WoW addon download) and lists it in manifest.json. Zips that already
@@ -60,7 +63,9 @@ def main():
     mpath = os.path.join(ROOT, "manifest.json")
     if os.path.exists(mpath):
         old = json.load(open(mpath))
-    entries = []
+    chan_path = os.path.join(ROOT, "channels.json")
+    test = set(json.load(open(chan_path)).get("test", [])) if os.path.exists(chan_path) else set()
+    entries, test_entries = [], []
     for name in sorted(os.listdir(addons_dir)):
         folder = os.path.join(addons_dir, name)
         if not os.path.isdir(folder):
@@ -77,7 +82,7 @@ def main():
         else:
             print("exists", zname)
         notes = re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", t.get("Notes", ""))
-        entries.append({
+        (test_entries if name in test else entries).append({
             "folder": name,
             "title": t.get("Title", name),
             "version": ver,
@@ -93,11 +98,12 @@ def main():
             "version": open(lver_file).read().strip(),
             "url": RAW + "releases/TopRamenLauncher.exe",
         }
-    manifest = {"schema": 1, "addons": entries, "launcher": launcher}
+    # test addons get their own list, so launchers older than 1.1.0 never see them
+    manifest = {"schema": 1, "addons": entries, "testAddons": test_entries, "launcher": launcher}
     with open(mpath, "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")
-    print("wrote manifest.json with", len(entries), "addons")
+    print("wrote manifest.json with", len(entries), "addons and", len(test_entries), "test addons")
 
 
 if __name__ == "__main__":

@@ -46,6 +46,11 @@
   .pill.update { color:var(--gold); border-color:var(--trim); background:var(--active); }
   .pill.missing { color:var(--muted); border-color:var(--line); background:var(--well); }
   .pill.newer { color:#93c5fd; border-color:#2b3f5a; background:#131c26; }
+  .tag { font-size:10.5px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#e9a8ff;
+    border:1px solid #5a2b6b; background:#22132a; border-radius:4px; padding:1px 6px; margin-left:8px; vertical-align:2px; }
+  .addon.test { border-style:dashed; }
+  .testopt { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:12.5px; cursor:pointer; user-select:none; white-space:nowrap; }
+  .testopt input { accent-color:#a8862e; width:15px; height:15px; margin:0; cursor:pointer; }
   button { font:inherit; color:var(--text); background:var(--button); border:1px solid var(--trim);
     border-radius:999px; padding:5px 15px; cursor:pointer; white-space:nowrap; }
   button:hover:not(:disabled) { background:var(--active); color:var(--gold); }
@@ -90,6 +95,7 @@
   <div class="list" id="list"><div class="empty"><span class="spin"></span>Checking for updates…</div></div>
 </main>
 <footer>
+  <label class="testopt" title="Test addons are still being worked on and may have problems."><input type="checkbox" id="chkTest"> <span id="testLbl">Show test addons</span></label>
   <span class="msg" id="msg"></span>
   <button id="btnCheck">Check for updates</button>
   <button class="primary" id="btnAll" disabled>Update all</button>
@@ -136,14 +142,17 @@ function render() {
       const ver = a.installed
         ? `Installed <b>${esc(a.installed)}</b> &nbsp;·&nbsp; Latest <b>${esc(a.latest)}</b>`
         : `Latest <b>${esc(a.latest)}</b>`;
-      return `<div class="addon">
-        <div class="t">${esc(a.title)}</div>
+      return `<div class="addon${a.test ? ' test' : ''}">
+        <div class="t">${esc(a.title)}${a.test ? '<span class="tag" title="Still being worked on; may have problems">Test</span>' : ''}</div>
         <div class="act"><span class="pill ${a.status}">${LABEL[a.status]}</span>${btn}</div>
         <div class="n">${esc(a.notes)}</div>
         <div class="v">${ver}</div></div>`;
     }).join('');
     L.querySelectorAll('button[data-f]').forEach(b => b.onclick = () => install([b.dataset.f]));
   }
+  $('chkTest').checked = !!s.showTest;
+  $('chkTest').disabled = busy;
+  $('testLbl').textContent = s.testCount && !s.showTest ? `Show test addons (${s.testCount})` : 'Show test addons';
   const todo = s.addons.filter(a => a.status === 'update');
   $('btnAll').textContent = todo.length ? `Update all (${todo.length})` : 'Update all';
   $('btnAll').disabled = busy || !todo.length || !s.pathOk;
@@ -182,6 +191,9 @@ $('btnCheck').onclick = async () => {
   busy = true; flash = null; render(); $('msg').innerHTML = '<span class="spin"></span>Checking…';
   try { state = await api('check', {}); } catch (e) {}
   busy = false; render();
+};
+$('chkTest').onchange = async () => {
+  try { state = await api('settings', { showTest: $('chkTest').checked }); flash = null; render(); } catch (e) {}
 };
 $('btnOpen').onclick = () => api('openFolder', {});
 $('btnBrowse').onclick = async () => {
