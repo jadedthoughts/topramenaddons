@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "addons": [
+    {
+      "folder": "TopRamenCrafting",
+      "title": "Top Ramen Crafting",
+      "version": "2.3.0",
+      "notes": "/topramencraft (or /trc) opens the crafting planner: what to craft to level up, what makes money, and what to buy, with prices from its own auction house scan (Auctionator optional).",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenCrafting-2.3.0.zip",
+      "size": 110921,
+      "sha256": "59a0e505f9fba2bae5d3d8fc5985830e226c4e2d696a95c5f67df45b11be2559"
+    },
+    {
+      "folder": "TopRamenExplorer",
+      "title": "Top Ramen Explorer",
+      "version": "1.1.0",
+      "notes": "/tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.1.0.zip",
+      "size": 82376,
+      "sha256": "d9574db7e0e2645e235d1550a33c32975efb68044d38e3cee8d7b05f3807ac47"
+    },
+    {
+      "folder": "TopRamenFarm",
+      "title": "Top Ramen Farm",
+      "version": "0.1.0",
+      "notes": "/trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done.",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenFarm-0.1.0.zip",
+      "size": 63377,
+      "sha256": "4b3f3ea8acd396bd08dcbff91ca8e3da165fc79fbc8e7577cd03d21f74d772bb"
+    },
+    {
+      "folder": "TopRamenGear",
+      "title": "Top Ramen Gear",
+      "version": "1.14.1",
+      "notes": "/trg opens your Druid gear window (Bear, Cat, Balance, Restoration); item tooltips show upgrade scores. /trg help for options.",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.14.1.zip",
+      "size": 96634,
+      "sha256": "bd9455d25861ca2f2e90c86dfbe42e4ffc0ea6e76856e53d61f7061a048127fa"
+    }
+  ],
+  "launcher": {
+    "version": "1.0.0",
+    "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenLauncher.exe"
+  }
+}

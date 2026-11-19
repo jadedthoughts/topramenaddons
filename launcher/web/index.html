@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Top Ramen Forever Launcher</title>
+<link rel="icon" href="logo.png">
+<style>
+  :root {
+    --bg:#14110d; --panel:#1d1812; --row:#191510; --well:#0e0c09; --line:#3a3122; --trim:#6b5a2e;
+    --active:#3a2b14; --button:#2a2116; --gold:#ffd100; --text:#ece6d8; --muted:#b8ae9c; --dim:#8f877a;
+    --green:#4ade80; --red:#f87171; --orange:#ff7c0a;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font:14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  body { display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 20px 12px;
+    background:linear-gradient(180deg,#221b12,#16120d); border-bottom:1px solid var(--trim); }
+  header img { width:112px; height:56px; object-fit:contain; filter:drop-shadow(0 2px 6px #000); }
+  header h1 { margin:0; font:600 21px/1.1 Georgia, "Times New Roman", serif; color:var(--gold); letter-spacing:.3px; }
+  header .sub { color:var(--muted); font-size:12.5px; margin-top:3px; }
+  header .ver { margin-left:auto; color:var(--dim); font-size:12px; text-align:right; }
+  main { flex:1; overflow:auto; padding:14px 20px 8px; }
+  .bar { display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; padding:9px 12px; margin-bottom:12px; }
+  .bar .lbl { color:var(--muted); font-size:12px; white-space:nowrap; }
+  .bar .path { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-family:Consolas, monospace; font-size:12.5px; color:var(--text); }
+  .bar .path.bad { color:var(--red); font-family:inherit; }
+  .notice { border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:13px; border:1px solid; }
+  .notice.err { background:#2a1414; border-color:#6b2a2a; color:#ffd0d0; }
+  .notice.info { background:var(--active); border-color:var(--trim); color:var(--text); }
+  .notice.ok { background:#13261a; border-color:#2b5a3a; color:#c9f5d6; }
+  .notice a { color:var(--gold); cursor:pointer; text-decoration:underline; }
+  .list { display:flex; flex-direction:column; gap:8px; }
+  .addon { display:grid; grid-template-columns:1fr auto; gap:4px 14px; align-items:center;
+    background:var(--row); border:1px solid var(--line); border-radius:8px; padding:11px 14px; }
+  .addon:hover { border-color:var(--trim); }
+  .addon .t { font-weight:600; color:var(--gold); font-size:15px; }
+  .addon .n { grid-column:1; color:var(--muted); font-size:12.5px; }
+  .addon .v { grid-column:1; font-size:12.5px; color:var(--dim); }
+  .addon .v b { color:var(--text); font-weight:600; }
+  .addon .act { grid-column:2; grid-row:1 / span 3; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .pill { font-size:11.5px; padding:2px 9px; border-radius:999px; border:1px solid; white-space:nowrap; }
+  .pill.current { color:var(--green); border-color:#2b5a3a; background:#13261a; }
+  .pill.update { color:var(--gold); border-color:var(--trim); background:var(--active); }
+  .pill.missing { color:var(--muted); border-color:var(--line); background:var(--well); }
+  .pill.newer { color:#93c5fd; border-color:#2b3f5a; background:#131c26; }
+  button { font:inherit; color:var(--text); background:var(--button); border:1px solid var(--trim);
+    border-radius:999px; padding:5px 15px; cursor:pointer; white-space:nowrap; }
+  button:hover:not(:disabled) { background:var(--active); color:var(--gold); }
+  button:disabled { opacity:.45; cursor:default; }
+  button.primary { background:linear-gradient(180deg,#5a4512,#3a2b0c); border-color:#a8862e; color:var(--gold); font-weight:600; }
+  button.primary:hover:not(:disabled) { background:linear-gradient(180deg,#6d5416,#4a370f); }
+  button.small { padding:2px 10px; font-size:12px; }
+  button.link { background:none; border:none; color:var(--dim); padding:0; font-size:12px; text-decoration:underline; }
+  button.link:hover:not(:disabled) { background:none; color:var(--muted); }
+  footer { display:flex; align-items:center; gap:10px; padding:11px 20px; border-top:1px solid var(--line); background:var(--panel); }
+  footer .msg { flex:1; color:var(--muted); font-size:12.5px; }
+  .empty { color:var(--muted); text-align:center; padding:30px 0; }
+  .spin { display:inline-block; width:12px; height:12px; border:2px solid var(--trim); border-top-color:var(--gold);
+    border-radius:50%; animation:s 0.8s linear infinite; vertical-align:-1px; margin-right:6px; }
+  @keyframes s { to { transform:rotate(360deg); } }
+  .pathedit { display:none; gap:8px; margin:-4px 0 12px; }
+  .pathedit input { flex:1; font:12.5px Consolas, monospace; background:var(--well); color:var(--text);
+    border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="logo.png" alt="">
+  <div>
+    <h1>Top Ramen Forever Launcher</h1>
+    <div class="sub">Install and update the Top Ramen addons for WoW Forever</div>
+  </div>
+  <div class="ver" id="ver"></div>
+</header>
+<main>
+  <div class="bar">
+    <span class="lbl">AddOns folder</span>
+    <span class="path" id="path">Looking…</span>
+    <button class="small" id="btnBrowse">Change…</button>
+    <button class="small" id="btnOpen">Open</button>
+  </div>
+  <div class="pathedit" id="pathedit">
+    <input id="pathInput" placeholder="C:\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns" spellcheck="false">
+    <button class="small" id="btnPathSave">Use this folder</button>
+  </div>
+  <div id="notices"></div>
+  <div class="list" id="list"><div class="empty"><span class="spin"></span>Checking for updates…</div></div>
+</main>
+<footer>
+  <span class="msg" id="msg"></span>
+  <button id="btnCheck">Check for updates</button>
+  <button class="primary" id="btnAll" disabled>Update all</button>
+</footer>
+<script>
+const $ = id => document.getElementById(id);
+let state = null, busy = false, flash = null;
+
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) };
+  const r = await fetch('/api/' + path, opt);
+  if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+  return r.json();
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+const LABEL = { current:'Up to date', update:'Update available', missing:'Not installed', newer:'Your copy is newer' };
+
+function render() {
+  const s = state; if (!s) return;
+  $('ver').textContent = 'Launcher ' + s.launcherVersion;
+  const p = $('path');
+  if (s.pathOk) { p.textContent = s.addonsPath; p.className = 'path'; p.title = s.addonsPath; }
+  else { p.textContent = "Couldn't find your WoW Forever AddOns folder. Click Change… to pick it."; p.className = 'path bad'; }
+  $('btnOpen').disabled = !s.pathOk;
+  $('pathedit').style.display = s.pathOk ? 'none' : 'flex';
+
+  let n = '';
+  if (flash) n += `<div class="notice ${flash.kind}">${flash.html}</div>`;
+  if (s.manifestError) n += `<div class="notice err">${esc(s.manifestError)}</div>`;
+  if (s.launcherUpdate) n += `<div class="notice info">A new launcher (version ${esc(s.launcherUpdate)}) is available. <a id="getLauncher">Download it</a>, then close this one and run the new file.</div>`;
+  $('notices').innerHTML = n;
+  if ($('getLauncher')) $('getLauncher').onclick = () => api('openURL', { URL: s.launcherUrl });
+
+  const L = $('list');
+  if (!s.addons.length) {
+    L.innerHTML = s.manifestError ? '<div class="empty">No update list yet.</div>' : '<div class="empty"><span class="spin"></span>Checking for updates…</div>';
+  } else {
+    L.innerHTML = s.addons.map(a => {
+      let btn = '';
+      if (a.status === 'update') btn = `<button class="primary small" data-f="${esc(a.folder)}">Update</button>`;
+      else if (a.status === 'missing') btn = `<button class="small" data-f="${esc(a.folder)}">Install</button>`;
+      else if (a.status === 'current') btn = `<button class="link" data-f="${esc(a.folder)}" title="Download this version again, to repair a broken copy">Reinstall</button>`;
+      const ver = a.installed
+        ? `Installed <b>${esc(a.installed)}</b> &nbsp;·&nbsp; Latest <b>${esc(a.latest)}</b>`
+        : `Latest <b>${esc(a.latest)}</b>`;
+      return `<div class="addon">
+        <div class="t">${esc(a.title)}</div>
+        <div class="act"><span class="pill ${a.status}">${LABEL[a.status]}</span>${btn}</div>
+        <div class="n">${esc(a.notes)}</div>
+        <div class="v">${ver}</div></div>`;
+    }).join('');
+    L.querySelectorAll('button[data-f]').forEach(b => b.onclick = () => install([b.dataset.f]));
+  }
+  const todo = s.addons.filter(a => a.status === 'update');
+  $('btnAll').textContent = todo.length ? `Update all (${todo.length})` : 'Update all';
+  $('btnAll').disabled = busy || !todo.length || !s.pathOk;
+  $('btnCheck').disabled = busy;
+  document.querySelectorAll('button[data-f]').forEach(b => b.disabled = busy || !s.pathOk);
+  if (!busy) $('msg').textContent = s.checkedAt
+    ? (todo.length ? `${todo.length} update${todo.length > 1 ? 's' : ''} ready. Checked at ${s.checkedAt}.` : `Everything is up to date. Checked at ${s.checkedAt}.`)
+    : '';
+}
+
+async function install(folders) {
+  if (busy) return;
+  busy = true; flash = null; render();
+  const names = folders.map(f => (state.addons.find(a => a.folder === f) || {}).title || f);
+  $('msg').innerHTML = `<span class="spin"></span>Installing ${esc(names.join(', '))}…`;
+  try {
+    const r = await api('install', { folders });
+    if (r.error) flash = { kind:'err', html: esc(r.error) };
+    else {
+      const ok = r.results.filter(x => x.ok), bad = r.results.filter(x => !x.ok);
+      const title = f => (state.addons.find(a => a.folder === f) || {}).title || f;
+      let h = '';
+      if (ok.length) h += `Installed ${ok.map(x => esc(title(x.folder)) + ' ' + esc(x.version)).join(', ')}. In WoW, type <b>/reload</b>, or restart the game if an addon is new to you.`;
+      if (bad.length) h += (h ? '<br>' : '') + bad.map(x => `${esc(title(x.folder))}: ${esc(x.error)}`).join('<br>');
+      flash = { kind: bad.length ? 'err' : 'ok', html: h };
+      state = r.state;
+    }
+  } catch (e) { flash = { kind:'err', html: 'Something went wrong: ' + esc(e.message) }; }
+  busy = false; render();
+}
+
+async function load() { try { state = await api('state'); render(); } catch (e) {} }
+
+$('btnAll').onclick = () => install(state.addons.filter(a => a.status === 'update').map(a => a.folder));
+$('btnCheck').onclick = async () => {
+  busy = true; flash = null; render(); $('msg').innerHTML = '<span class="spin"></span>Checking…';
+  try { state = await api('check', {}); } catch (e) {}
+  busy = false; render();
+};
+$('btnOpen').onclick = () => api('openFolder', {});
+$('btnBrowse').onclick = async () => {
+  const r = await api('path', { browse:true });
+  if (r.ok) { state = r.state; flash = null; render(); }
+  else if (!r.cancelled) { flash = { kind:'err', html: esc(r.error) }; render(); $('pathedit').style.display = 'flex'; }
+  else { $('pathedit').style.display = 'flex'; }
+};
+$('btnPathSave').onclick = async () => {
+  const r = await api('path', { path: $('pathInput').value });
+  if (r.ok) { state = r.state; flash = null; } else flash = { kind:'err', html: esc(r.error) };
+  render();
+};
+
+load();
+// keep checking until the first update list arrives
+const firstLoad = setInterval(() => { if (state && (state.addons.length || state.manifestError)) clearInterval(firstLoad); else load(); }, 700);
+// tell the launcher this window is still open
+setInterval(() => fetch('/api/ping').catch(() => {}), 2000);
+fetch('/api/ping');
+</script>
+</body>
+</html>

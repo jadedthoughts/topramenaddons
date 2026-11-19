@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: Top Ramen Explorer
+## Notes: /tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.
+## Author: Top Ramen
+## Version: 1.1.0
+## SavedVariables: TopRamenExplorerDB
+## OptionalDeps: TomTom
+## IconTexture: Interface\AddOns\TopRamenExplorer\Media\trIcon
+
+Core.lua
+TRUI.lua
+Data.lua
+Unverified.lua
+Cataclysm.lua
+Share.lua
+Pins.lua
+Window.lua

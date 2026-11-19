@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: Top Ramen Gear
+## Notes: /trg opens your Druid gear window (Bear, Cat, Balance, Restoration); item tooltips show upgrade scores. /trg help for options.
+## Author: Top Ramen
+## Version: 1.14.1
+## SavedVariables: TopRamenGearDB
+## OptionalDeps: ForeverDungeonJournal, DialogueUI, Auctionator
+## IconTexture: Interface\AddOns\TopRamenGear\Media\trIcon
+
+TopRamenGear.lua
+Score.lua
+Tooltip.lua
+Talents.lua
+UI.lua
+Settings.lua
+Dungeons.lua
+Window.lua

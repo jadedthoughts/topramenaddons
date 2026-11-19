@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: Top Ramen Farm
+## Notes: /trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done.
+## Author: Top Ramen
+## Version: 0.1.0
+## IconTexture: Interface\AddOns\TopRamenFarm\Media\trIcon
+## SavedVariables: TopRamenFarmDB
+## OptionalDeps: TopRamenCrafting, Auctionator
+
+TRUI.lua
+TopRamenFarm.lua
+Window.lua
