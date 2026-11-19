@@ -2,12 +2,21 @@
 ## Title: Top Ramen Farm
 ## Notes: /trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done. At a merchant, the Vendor items button sells the items you ticked.
 ## Author: Top Ramen
-## Version: 0.2.0
+## Version: 0.2.1
 ## IconTexture: Interface\AddOns\TopRamenFarm\Media\trIcon
-## SavedVariables: TopRamenFarmDB
+## SavedVariables: TopRamenFarmDB, TopRamenLauncherDB
 ## OptionalDeps: TopRamenCrafting, Auctionator
+## AddonCompartmentFunc: TopRamenFarm_TRLaunch
+## X-TR-Letter: F
+## X-TR-Label: Farm
+## X-TR-Cmd: /trfarm
+## X-TR-Slash: TOPRAMENFARM
+## X-TR-Color: e6b422
+## X-TR-Icon: INV_Misc_Coin_02
+## X-TR-Order: 1
 
 TRUI.lua
 TopRamenFarm.lua
 Window.lua
 Vendor.lua
+TRLauncher.lua

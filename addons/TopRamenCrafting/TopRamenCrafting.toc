@@ -2,13 +2,22 @@
 ## Title: Top Ramen Crafting
 ## Notes: /topramencraft (or /trc) opens the crafting planner: what to craft to level up, what makes money, and what to buy, with prices from its own auction house scan (Auctionator optional).
 ## Author: Top Ramen
-## Version: 2.4.0
+## Version: 2.4.1
 ## IconTexture: Interface\AddOns\TopRamenCrafting\Media\trIcon
-## SavedVariables: TopRamenCraftDB
+## SavedVariables: TopRamenCraftDB, TopRamenLauncherDB
 ## OptionalDeps: Auctionator
+## AddonCompartmentFunc: TopRamenCrafting_TRLaunch
+## X-TR-Letter: C
+## X-TR-Label: Crafting
+## X-TR-Cmd: /trc
+## X-TR-Slash: TOPRAMENCRAFT
+## X-TR-Color: c084fc
+## X-TR-Icon: Trade_BlackSmithing
+## X-TR-Order: 4
 
 TopRamenCrafting.lua
 Prices.lua
 TRUI.lua
 Planner.lua
 Window.lua
+TRLauncher.lua

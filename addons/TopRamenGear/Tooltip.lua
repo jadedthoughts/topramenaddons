@@ -9,7 +9,7 @@ local GREEN, RED, GREY = "|cff40d040", "|cffff5050", "|cff9d9d9d"
 -- slot group -> equipment slot ids it can replace
 local INV = {
   head = { 1 }, neck = { 2 }, shoulder = { 3 }, chest = { 5 }, waist = { 6 }, legs = { 7 }, feet = { 8 }, wrist = { 9 },
-  hands = { 10 }, finger = { 11, 12 }, trinket = { 13, 14 }, back = { 15 }, relic = { 18 },
+  hands = { 10 }, finger = { 11, 12 }, trinket = { 13, 14 }, back = { 15 }, relic = { 18 }, ranged = { 18 }, shield = { 17 },
 }
 
 ---------------------------------------------------------------------------
@@ -89,10 +89,11 @@ local function plan(it, mode)
       return { old = { mh }, new = { it }, base = baseWithout({ [16] = true, [17] = true }), note = "replacing your two-hander" }
     end
     return { old = { mh }, new = { it }, base = baseWithout({ [16] = true }) }
-  elseif s == "offhand" then
+  elseif s == "offhand" or s == "offweapon" or s == "shield" then
     local mh = g[16]
     if mh and mh.s == "weapon2h" then return nil, "needs a one-hand weapon" end
-    return { old = { g[17] }, new = { it }, base = baseWithout({ [17] = true }) }
+    -- a weapon in the off hand hits for half: its DPS counts as off-hand DPS
+    return { old = { ns.AsOffhand(g[17]) }, new = { ns.AsOffhand(it) }, base = baseWithout({ [17] = true }) }
   end
   local slots = INV[s]
   if not slots then return nil end
@@ -212,6 +213,7 @@ function ns.Command(msg)
     say("/trg - open the gear window")
     say("/trg dungeons - what's worth hunting in each dungeon")
     say("/trg talents - show which of your talents change item stats (/trg talents all lists every one)")
+    say("/trg preview hunter - see Top Ramen as a Hunter would on this character (/trg preview off to stop; then /reload)")
     say("/trg equip - put on the best items from your bags for the spec picked in the window (same as the Equip best button)")
     say("/trg stats - show the level, form, armor and health the scores are based on")
     say("/trg usetalents - include your talents in scores on/off (now " .. onOff(db.useTalents ~= false) .. ")")
@@ -257,8 +259,17 @@ function ns.Command(msg)
     db.showCat = not db.showCat; say("Cat line " .. onOff(db.showCat)); return true
   elseif cmd == "balance" then
     db.showBalance = not db.showBalance; say("Balance line " .. onOff(db.showBalance)); return true
+  elseif cmd == "preview" then
+    local c = (arg or ""):upper()
+    if c == "" or c == "OFF" then db.previewClass = nil
+    elseif ns.SPECS[c] then db.previewClass = c
+    else say("/trg preview hunter, /trg preview druid, or /trg preview off"); return true end
+    if ns.ClearCache then ns.ClearCache() end
+    if ns.ClearScores then ns.ClearScores() end
+    say("preview: " .. (db.previewClass or "off") .. ". Type /reload to see it in the window.")
+    return true
   elseif cmd == "equip" then
-    ns.EquipBest(ns.db.windowMode); return true
+    ns.EquipBest(ns.CurrentMode()); return true
   elseif cmd == "resto" or cmd == "restoration" then
     db.showResto = not db.showResto; say("Restoration line " .. onOff(db.showResto)); return true
   elseif cmd == "3t" then
@@ -293,12 +304,14 @@ ev:SetScript("OnEvent", function(_, event, arg1)
   if event == "PLAYER_LOGIN" then
     ns.InitDB()
     local _, class = UnitClass("player")
-    ns.isDruid = (class == "DRUID") -- tooltip lines only on a Druid
+    ns.isDruid = ns.ClassSupported() -- tooltip lines only for classes Top Ramen scores (Druid, Hunter)
     hook()
     ns.RegisterDialogueUI()
     equippedDirty = true
   elseif event == "PLAYER_LEVEL_UP" or event == "SPELLS_CHANGED" then
     if ns.ForgetBearForm then ns.ForgetBearForm() end -- e.g. you just learned Dire Bear Form
+    -- what you can wear changes with level (Hunters: mail at 40)
+    if event == "PLAYER_LEVEL_UP" and ns.ClearCache then ns.ClearCache() end
     equippedDirty = true
   elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "UNIT_ATTACK_POWER" or event == "PLAYER_REGEN_ENABLED" or event == "UPDATE_SHAPESHIFT_FORM" then
     equippedDirty = true

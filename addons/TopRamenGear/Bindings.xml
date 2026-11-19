@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENGEAR_OPEN" header="TOPRAMENGEAR" category="ADDONS">
+    TopRamenGear_TRLaunch()
+  </Binding>
+</Bindings>

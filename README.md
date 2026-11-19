@@ -10,6 +10,8 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 | Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house, sortable columns, and a Vendor items button that sells the items you tick |
 | Top Ramen Map *(test)* | `/trmap` | Big live minimap and whole-dungeon overview. Needs the Forever Dungeon Journal addon for its map images |
 
+**Opening them:** every Top Ramen addon shares one bowl button on the minimap. Click it for a menu of the addons you have, right-click to reopen the last one, and drag it to move it. Each row has a **Macro** button that makes a macro for your action bar. You can also type `/tr` for the menu, `/tr button` to hide or show the minimap button, or set a hotkey under Esc → Key Bindings → AddOns.
+
 **Test addons** are still being worked on. They only appear in the launcher when you tick **Show test addons** at the bottom of its window.
 
 ## Install with the launcher (easiest)

@@ -13,6 +13,7 @@ ns.TalentMods = { bear = {}, cat = {}, balance = {}, resto = {}, hit = 0, spellH
 local STATWORDS = {
   { "stamina", "sta" }, { "strength", "str" }, { "agility", "agi" }, { "intellect", "int" }, { "spirit", "spi" },
   { "armor contribution from", "armor" }, { "armor from items", "armor" }, { "armor value from items", "armor" },
+  { "total health", "sta" }, -- Survivalist: +10% health is +10% from Stamina too
 }
 
 local scanTip
@@ -56,19 +57,67 @@ function ns.ParseTalentText(text)
   if low:find("^ shapeshift into") then return effects, hit, spellHit end
   -- your own hit chance (not lowering the enemy's): spell hit if the sentence is about spells
   for sentence in low:gmatch("[^%.]+") do
-    local h = sentence:match("your chance to hit[^%%]-by (%d+)%%")
-    if h and not sentence:find("decreas") and not sentence:find("reduc") then
+    local h = sentence:match("your chance to hit[^%%]-by (%d+)%%") or sentence:match("your hit chance[^%%]-by (%d+)%%")
+    -- "reduces/decreases" before the hit wording means it's about the enemy's hit; only some abilities = not gear hit
+    local hitAt = sentence:find("hit") or 1
+    local before = sentence:sub(1, hitAt)
+    if h and (before:find("decreas") or before:find("reduc") or sentence:find("trap") or sentence:find("feign death")
+      or sentence:find("off%-hand")) then h = nil end
+    -- Forever's hit is one stat for attacks and spells, so a plain "chance to hit" talent counts for both
+    if h and not sentence:find("spell") then spellHit = spellHit + tonumber(h) end
+    if h then
       if sentence:find("spell") then spellHit = spellHit + tonumber(h) else hit = hit + tonumber(h) end
+    end
+  end
+  -- Defense from talents (Anticipation: "Increases your Defense Skill by 20") lowers what a tank needs from gear
+  local dskill = low:match("increases your defense skill by (%d+)") or low:match("increases your defense by (%d+)")
+  if dskill then effects[#effects + 1] = { forms = { tank = true }, stat = "defskill", pct = tonumber(dskill) } end
+  -- Intellect / Spirit turned into power (Careful Aim, Mental Dexterity, Mental Quickness, Champion of the Light,
+  -- Natural Instinct, Spiritual Guidance): makes that stat worth what it turns into
+  local conv = false
+  local i2a = low:match("attack power by (%d+)%% of your intellect") or low:match("attack power by an amount equal to (%d+)%% of your intellect")
+  if i2a then effects[#effects + 1] = { forms = {}, stat = "int2ap", pct = tonumber(i2a) }; conv = true end
+  for sentence in low:gmatch("[^%.]+") do
+    for clause in (sentence .. " and "):gmatch("(.-) and ") do
+      local p, stat = clause:match("by up to (%d+)%% of your t?o?t?a?l? ?(%a+)")
+      if not p then p, stat = clause:match("by (%d+)%% of your t?o?t?a?l? ?(%a+)") end
+      if p and (stat == "intellect" or stat == "spirit") and not clause:find("attack power") and not clause:find("armor") then
+        local from = stat == "intellect" and "int" or "spi"
+        local heal = clause:find("heal") or sentence:find("damage and healing") and true
+        local dmg = clause:find("damage") or sentence:find("damage and healing") and true
+        if heal then effects[#effects + 1] = { forms = {}, stat = from .. "2heal", pct = tonumber(p) }; conv = true end
+        if dmg then effects[#effects + 1] = { forms = {}, stat = from .. "2sp", pct = tonumber(p) }; conv = true end
+      end
     end
   end
   -- extra critical strike damage on abilities makes crit worth more (about half your damage is from abilities)
   local cd
   for sentence in low:gmatch("[^%.]+") do
     local part, v = sentence:match("(critical strike damage bonus[^%%]-by (%d+)%%)")
-    if v and part:find("melee") and not part:find("spell") then cd = v end
-    -- spell crit damage (Vengeance): +100% to a 50% bonus doubles what spell crit is worth, for Balance
-    if v and part:find("spell") and not part:find("melee") then
-      effects[#effects + 1] = { forms = { balance = true }, stat = "scrit", pct = tonumber(v), critDmgSpell = tonumber(v) }
+    if not v then part, v = sentence:match("(critical strike healing bonus[^%%]-by (%d+)%%)") end
+    if not v then part, v = sentence:match("(critical strike damage[^%%]-by (%d+)%%)") end
+    -- Hunters: ranged crit damage (Mortal Shots) helps the ranged specs, melee (Predator's Edge) Survival
+    local hunterDone = false
+    if v and sentence:find("ranged") and not sentence:find("melee") then
+      effects[#effects + 1] = { forms = { bm = true, mm = true }, stat = "crit", pct = tonumber(v) / 2, critDmg = tonumber(v) }
+      hunterDone = true
+    elseif v and sentence:find("melee") and sentence:find("abilit") and not sentence:find("spell") and part and not part:find("melee") then
+      effects[#effects + 1] = { forms = { sv = true }, stat = "crit", pct = tonumber(v) / 2, critDmg = tonumber(v) }
+      hunterDone = true
+    end
+    if hunterDone then v = nil end
+    -- Druids: melee ability crit damage (Natural Instinct) helps every spec
+    if v and part:find("melee") and not part:find("spell") then cd = v
+    -- spell crit damage (Vengeance, Shadowform, Elemental Fury, Ruin...): +100% to a 50% bonus doubles what
+    -- spell crit is worth, for the class's caster specs
+    elseif v and (part:find("spell") or sentence:find("spells")) and not part:find("melee") and not sentence:find("heal") then
+      effects[#effects + 1] = { forms = { caster = true }, stat = "scrit", pct = tonumber(v), critDmgSpell = tonumber(v) }
+    -- crit healing (Holy Power): healers
+    elseif v and sentence:find("heal") then
+      effects[#effects + 1] = { forms = { healer = true }, stat = "scrit", pct = tonumber(v) / 2, critDmgSpell = tonumber(v) }
+    -- other abilities (Impale, Lethality): physical specs; about half the damage is from abilities
+    elseif v and not sentence:find("ranged") and not sentence:find("spell") then
+      effects[#effects + 1] = { forms = { melee = true, tank = true }, stat = "crit", pct = tonumber(v) / 2, critDmg = tonumber(v) }
     end
   end
   if cd then effects[#effects + 1] = { forms = {}, stat = "crit", pct = tonumber(cd) / 2, critDmg = tonumber(cd) } end
@@ -81,7 +130,11 @@ function ns.ParseTalentText(text)
       if clause:find("bear") then forms.bear = true end
       if clause:find("cat") then forms.cat = true end
       local otherFormOnly = clause:find("moonkin") and not forms.bear and not forms.cat
-      local matched = otherFormOnly and true or false
+      -- a short buff after something happens (Spirit Tap, Dark Inspiration) or a conversion read above isn't a
+      -- permanent bonus on gear
+      local temporary = sentence:find("for %d+ sec") or sentence:find("after killing") or sentence:find("each time")
+        or (conv and (clause:find("of your") or false))
+      local matched = (otherFormOnly or temporary) and true or false
       -- "all attributes" / "all stats": every primary stat
       local s0 = clause:find("all attributes", 1, true) or clause:find("all stats", 1, true)
       if s0 then
@@ -116,14 +169,28 @@ function ns.ParseTalentText(text)
 end
 
 local function apply(mods, e)
-  local targets = {}
-  if e.forms.bear or e.forms.cat or e.forms.balance then
-    if e.forms.bear then targets[#targets + 1] = "bear" end
-    if e.forms.cat then targets[#targets + 1] = "cat" end
-    if e.forms.balance then targets[#targets + 1] = "balance" end
-  else
-    targets = { "bear", "cat", "balance", "resto" } -- e.g. "+10% Intellect" helps every spec
+  -- the effect's specs, kept to this character's class; none named = every spec of the class
+  -- (e.g. "+10% Intellect"; a Hunter talent mentioning "cat" in some other word isn't a Cat Form bonus)
+  local targets, mine = {}, {}
+  for _, sp in ipairs(ns.ClassSpecs()) do mine[sp.key] = true end
+  for k in pairs(e.forms) do if mine[k] then targets[#targets + 1] = k end end
+  -- roles: "caster" / "healer" / "melee" / "tank" mean this class's specs with that role
+  local named = next(e.forms) ~= nil
+  for _, sp in ipairs(ns.ClassSpecs()) do
+    local role = ns.Role(sp.key)
+    if e.forms[role] and not mine[role] then
+      local dup = false
+      for _, t in ipairs(targets) do if t == sp.key then dup = true end end
+      if not dup then targets[#targets + 1] = sp.key end
+    end
   end
+  -- named only roles/forms this class doesn't have (e.g. a Cat Form bonus for a Hunter): nothing to apply
+  if named and #targets == 0 then
+    local onlyRoles = true
+    for k in pairs(e.forms) do if not (k == "caster" or k == "healer" or k == "melee" or k == "tank" or k == "ranged") then onlyRoles = false end end
+    if onlyRoles then return end
+  end
+  if #targets == 0 then for _, sp in ipairs(ns.ClassSpecs()) do targets[#targets + 1] = sp.key end end
   for _, m in ipairs(targets) do
     mods[m] = mods[m] or {}
     mods[m][e.stat] = (mods[m][e.stat] or 0) + e.pct / 100

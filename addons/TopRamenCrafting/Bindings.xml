@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENCRAFTING_OPEN" header="TOPRAMENCRAFTING" category="ADDONS">
+    TopRamenCrafting_TRLaunch()
+  </Binding>
+</Bindings>

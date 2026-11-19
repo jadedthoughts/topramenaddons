@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENFARM_OPEN" header="TOPRAMENFARM" category="ADDONS">
+    TopRamenFarm_TRLaunch()
+  </Binding>
+</Bindings>

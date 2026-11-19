@@ -118,21 +118,32 @@ function ns.Analyse(mode)
   do
     local base = ns.BaseWithout({ [16] = true, [17] = true })
     local mh, oh = g[16], g[17]
-    local cur = { mh, oh }
+    -- an off-hand weapon counts as off-hand DPS (half-damage hits); held-in-off-hand items are unchanged
+    local cur = { mh, ns.AsOffhand(oh) }
     local curS = sc(cur, mode, base, 1)
     local best, bestS = cur, curS
     local twos, ones, offs = {}, {}, { false }
     if mh then (mh.s == "weapon2h" and twos or ones)[#(mh.s == "weapon2h" and twos or ones) + 1] = mh end
-    if oh then offs[#offs + 1] = oh end
+    if oh then offs[#offs + 1] = ns.AsOffhand(oh) end
     for _, it in ipairs(bags.weapon2h or {}) do twos[#twos + 1] = it end
     for _, it in ipairs(bags.weapon1h or {}) do ones[#ones + 1] = it end
     for _, it in ipairs(bags.offhand or {}) do offs[#offs + 1] = it end
+    for _, it in ipairs(bags.shield or {}) do offs[#offs + 1] = it end
+    -- Hunters dual wield: off-hand weapons, and one-handers that can go in either hand
+    for _, it in ipairs(bags.offweapon or {}) do offs[#offs + 1] = ns.AsOffhand(it) end
+    if ns.ClassSlot("INVTYPE_WEAPONOFFHAND", 2, 7) then
+      for _, it in ipairs(ones) do
+        if it.loc == "INVTYPE_WEAPON" then offs[#offs + 1] = ns.AsOffhand(it) end
+      end
+    end
     for _, w in ipairs(twos) do
       local s = sc({ w }, mode, base, 1)
       if s > bestS + 0.05 then best, bestS = { w }, s end
     end
     for _, w in ipairs(ones) do
       for _, o in ipairs(offs) do
+        -- (not the same item in both hands)
+        if o and (o.offhandOf or o) == w then o = nil end
         local combo = o and { w, o } or { w }
         local s = sc(combo, mode, base, 1)
         if s > bestS + 0.05 then best, bestS = combo, s end
@@ -144,18 +155,23 @@ function ns.Analyse(mode)
     }
   end
 
-  -- idol
+  -- idol (Druid) or ranged weapon (Hunter): the same slot
   do
+    local class = ns.PlayerClass()
+    local R = ns.CLASS_RULES[class] or {}
+    local LABEL = { DRUID = "Idol", PALADIN = "Libram", SHAMAN = "Totem", PRIEST = "Wand", MAGE = "Wand", WARLOCK = "Wand" }
+    local key = R.relic and "relic" or "ranged"
+    local label = LABEL[class] or "Ranged"
     local base = ns.BaseWithout({ [18] = true })
     local cur = g[18]
     local curS = cur and sc({ cur }, mode, base, 1) or 0
     local best, bestS = cur, curS
-    for _, it in ipairs(bags.relic or {}) do
+    for _, it in ipairs(bags[key] or {}) do
       local s = sc({ it }, mode, base, 1)
       if s > bestS + 0.05 then best, bestS = it, s end
     end
     rows[#rows + 1] = {
-      label = "Idol", cur = { cur }, best = { best }, slots = { 18 }, curS = curS, bestS = bestS,
+      label = label, cur = { cur }, best = { best }, slots = { 18 }, curS = curS, bestS = bestS,
       curS3 = cur and sc({ cur }, mode, base, 3) or 0, bestS3 = best and sc({ best }, mode, base, 3) or 0,
     }
   end
@@ -267,7 +283,7 @@ local function finishEquip(msg)
 end
 
 function ns.EquipBest(mode)
-  mode = mode or ns.db.windowMode or "bear"
+  mode = mode or ns.CurrentMode()
   if equipQueue then return end
   if InCombatLockdown and InCombatLockdown() then
     print("|cffffd100Top Ramen:|r can't change gear in combat. Try again when combat ends.")
@@ -458,14 +474,14 @@ end
 
 local function render()
   if not win or not win:IsShown() or not win.gearPage:IsShown() then return end
-  local mode = ns.db.windowMode or "bear"
+  local mode = ns.CurrentMode()
   win.specs:Update(mode)
   win.who:SetText(UI.WhoAmI())
   local gp = win.gearPage
   if not ns.isDruid then
     for _, r in ipairs(rowsUI) do r:Hide() end
-    gp.sumValue:SetText(HX.muted .. "Druid only for now|r")
-    win.footer:SetText("Top Ramen scores Druid gear for now (all four specs). Other classes are planned.")
+    gp.sumValue:SetText(HX.muted .. "Druids and Hunters for now|r")
+    win.footer:SetText("Top Ramen scores Druid (all four specs) and Hunter (all three) gear for now. More classes are planned.")
     return
   end
   local ok, rows, waiting = pcall(ns.Analyse, mode)
@@ -599,6 +615,7 @@ local function build()
   f:SetSize(W, H)
   f:SetPoint("CENTER")
   f:SetFrameStrata("HIGH")
+  UI.RegisterWindow(f) -- comes to the front over other Top Ramen windows when opened or clicked
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", f.StartMoving)
   f:SetClampedToScreen(true)
@@ -640,7 +657,7 @@ local function build()
   gp.sumLabel:SetPoint("BOTTOMRIGHT", gp.sumValue, "TOPRIGHT", 0, 3); gp.sumLabel:SetJustifyH("RIGHT")
 
   -- equip the winners
-  gp.equip = UI.Button(gp, 128, 32, "Equip best", function() ns.EquipBest(ns.db.windowMode) end,
+  gp.equip = UI.Button(gp, 128, 32, "Equip best", function() ns.EquipBest(ns.CurrentMode()) end,
     "Puts on every starred item from your bags for the spec selected above. Items that aren't soulbound yet will ask you to confirm, the same as equipping them yourself. Not in combat.")
   gp.equip:SetPoint("TOPLEFT", 16 + f.specs:GetWidth() + 16, -(HEAD_H + 20))
 

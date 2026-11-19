@@ -2,16 +2,27 @@
 ## Title: Top Ramen Gear
 ## Notes: /trg opens your class gear window, separated by spec. See what gear in your bags is the best while also getting an easy-to-use hunt list for items in any future dungeons. Not sure how much of an upgrade a dungeon drop is? Now you can compare the level of upgrade to anyone else who has the addon!
 ## Author: Top Ramen
-## Version: 1.14.2
-## SavedVariables: TopRamenGearDB
+## Version: 1.17.0
+## SavedVariables: TopRamenGearDB, TopRamenLauncherDB
 ## OptionalDeps: ForeverDungeonJournal, DialogueUI, Auctionator
 ## IconTexture: Interface\AddOns\TopRamenGear\Media\trIcon
+## AddonCompartmentFunc: TopRamenGear_TRLaunch
+## X-TR-Letter: G
+## X-TR-Label: Gear
+## X-TR-Cmd: /trg
+## X-TR-Slash: TOPRAMEN
+## X-TR-Color: ff7c0a
+## X-TR-Icon: INV_Helmet_03
+## X-TR-Order: 5
 
 TopRamenGear.lua
+Stats.lua
 Score.lua
+Classes.lua
 Tooltip.lua
 Talents.lua
 UI.lua
 Settings.lua
 Dungeons.lua
 Window.lua
+TRLauncher.lua

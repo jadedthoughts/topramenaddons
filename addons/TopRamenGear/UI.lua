@@ -116,8 +116,10 @@ function UI.SpecSwitcher(parent, onPick)
   f.buttons = {}
   local x = 4
   for _, sp in ipairs(ns.ClassSpecs()) do
-    local w = sp.key == "resto" and 106 or 84
-    local b = UI.Pill(f, w, 40, sp.name, sp.group, function() onPick(sp.key) end)
+    -- wide enough for the name ("Beast Mastery", "Restoration")
+    local b = UI.Pill(f, 84, 40, sp.name, sp.group, function() onPick(sp.key) end)
+    local w = math.max(84, math.floor((b.label:GetStringWidth() or 0) + 26))
+    b:SetWidth(w)
     b:SetPoint("TOPLEFT", x, -4)
     x = x + w + 4
     f.buttons[sp.key] = b
@@ -201,5 +203,28 @@ end
 function UI.WhoAmI()
   local name = UnitName and UnitName("player") or "?"
   local className = UnitClass and UnitClass("player") or ""
+  if ns.Previewing and ns.Previewing() then
+    local p = ns.PlayerClass()
+    className = className .. "  |cffff7c0a(previewing " .. p:sub(1, 1) .. p:sub(2):lower() .. ")|r"
+  end
   return (name or "?") .. " · Level " .. tostring(ns.Level() or "?") .. " " .. (className or "")
+end
+
+-- Top Ramen windows share one list (every Top Ramen addon adds its windows): the one you opened or clicked
+-- last is drawn on the "HIGH" layer and the others drop to "MEDIUM", so two windows never mix their parts.
+local stack = _G.TopRamenWindows or {}
+_G.TopRamenWindows = stack
+function UI.BringToFront(f)
+  for _, w in ipairs(stack) do
+    if w ~= f and w.SetFrameStrata then w:SetFrameStrata("MEDIUM") end
+  end
+  f:SetFrameStrata("HIGH")
+  if f.Raise then f:Raise() end
+end
+function UI.RegisterWindow(f)
+  for _, w in ipairs(stack) do if w == f then return end end
+  stack[#stack + 1] = f
+  if f.SetToplevel then f:SetToplevel(true) end
+  f:HookScript("OnShow", function(self) UI.BringToFront(self) end)
+  f:HookScript("OnMouseDown", function(self) UI.BringToFront(self) end)
 end

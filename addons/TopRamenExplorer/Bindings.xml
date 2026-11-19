@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENEXPLORER_OPEN" header="TOPRAMENEXPLORER" category="ADDONS">
+    TopRamenExplorer_TRLaunch()
+  </Binding>
+</Bindings>

@@ -30,6 +30,21 @@ ns.DEFAULT_W = {
             sp = 0, spnature = 0, sparcane = 0, shit = 0, spen = 0, wdps = 0, str = 0, agi = 0, ap = 0, fap = 0,
             hit = 0, crit = 0, haste = 0, exp = 0, armor = 0, def = 0, dodge = 0, parry = 0, wskill = 0, hp = 0,
             holyres = 0, fireres = 0, natureres = 0, frostres = 0, shadowres = 0, arcaneres = 0 },
+  -- Hunters: per point, 1 ranged attack power = 1 (14 attack power = 1 weapon DPS). "+attack power" on gear
+  -- raises ranged attack power too; Strength only raises melee attack power. Agility (worked out live in
+  -- ns.Weights) = 2 ranged attack power + crit. Guides (Icy Veins / wow.gg, Forever): weapon damage first,
+  -- then hit to the cap, Agility, crit; the pet inherits all of your crit. rwdps = bow/gun/crossbow DPS,
+  -- wdps = melee weapon DPS, ohwdps = an off-hand weapon's DPS (off-hand hits do half damage).
+  bm = { rwdps = 18, rap = 1, ap = 1, hit = 0.9, crit = 0.85, haste = 0.6, sta = 0.3, int = 0.1, spi = 0.1, mp5 = 0.4,
+         wdps = 0.3, ohwdps = 0.1, str = 0, armor = 0.01, dodge = 0, parry = 0, def = 0, exp = 0, hp = 0.03,
+         fireres = 0, natureres = 0, frostres = 0, shadowres = 0, arcaneres = 0, holyres = 0, sp = 0, heal = 0 },
+  mm = { rwdps = 19, rap = 1, ap = 1, hit = 0.95, crit = 0.85, haste = 0.55, sta = 0.25, int = 0.12, spi = 0.1, mp5 = 0.4,
+         wdps = 0.3, ohwdps = 0.1, str = 0, armor = 0.01, dodge = 0, parry = 0, def = 0, exp = 0, hp = 0.025,
+         fireres = 0, natureres = 0, frostres = 0, shadowres = 0, arcaneres = 0, holyres = 0, sp = 0, heal = 0 },
+  -- Survival is a melee spec in Forever ("weapon damage is your most important stat"): it dual wields
+  sv = { wdps = 14, ohwdps = 6, str = 1, ap = 1, rap = 0.15, rwdps = 2, hit = 0.9, exp = 0.9, crit = 0.85, haste = 0.5,
+         sta = 0.35, int = 0.05, spi = 0.08, mp5 = 0.2, armor = 0.02, dodge = 0.15, parry = 0.1, def = 0, hp = 0.035,
+         fireres = 0, natureres = 0, frostres = 0, shadowres = 0, arcaneres = 0, holyres = 0, sp = 0, heal = 0 },
 }
 local DEFAULTS = {
   tooltip = true,      -- show upgrade lines on item tooltips
@@ -37,6 +52,7 @@ local DEFAULTS = {
   showBear3 = true,    -- also show the Bear score with Swipe on 3 targets
   showBalance = false, -- Balance line on tooltips (turn on in Settings)
   showResto = false,   -- Restoration line on tooltips (turn on in Settings)
+  showBM = true, showMM = true, showSV = true, -- Hunter lines on tooltips
   capSpellHit = 17,    -- spell hit cap vs bosses (Wowhead Forever guide: 16% miss, 17% never misses)
   bearFocus = 0,       -- -100 survival .. +100 threat
   capHit = 8, talHit = 0, capExp = 6.5, capDef = 140,
@@ -47,15 +63,57 @@ local DEFAULTS = {
 -- the specs Top Ramen scores, by class (only Druids for now; Feral covers Bear and Cat)
 -- color: the spec's dot on tooltips and the window
 ns.SPECS = {
-  DRUID = { { key = "bear", name = "Bear", long = "Bear Tank", group = "Feral", show = "showBear", color = { 1, 0.49, 0.04 } },
+  DRUID = { { key = "bear", name = "Bear", long = "Bear Tank", group = "Feral", show = "showBear", color = { 1, 0.49, 0.04 }, tank = true },
             { key = "cat", name = "Cat", long = "Cat DPS", group = "Feral", show = "showCat", color = { 1, 0.82, 0 } },
             { key = "balance", name = "Balance", long = "Balance", group = "Caster", show = "showBalance", color = { 0.29, 0.66, 1 } },
             { key = "resto", name = "Restoration", long = "Restoration", group = "Healer", show = "showResto", color = { 0.29, 0.87, 0.5 } } },
+  HUNTER = { { key = "bm", name = "Beast Mastery", long = "Beast Mastery", group = "Ranged", show = "showBM", color = { 0.67, 0.83, 0.45 } },
+             { key = "mm", name = "Marksmanship", long = "Marksmanship", group = "Ranged", show = "showMM", color = { 0.29, 0.66, 1 } },
+             { key = "sv", name = "Survival", long = "Survival", group = "Melee", show = "showSV", color = { 1, 0.49, 0.04 } } },
 }
-function ns.ClassSpecs()
-  local _, class = UnitClass("player")
-  return ns.SPECS[class or ""] or ns.SPECS.DRUID
+-- the class Top Ramen scores for: yours, or the class you're previewing (Settings: "Preview as")
+function ns.RealClass() local _, c = UnitClass("player"); return c end
+function ns.PlayerClass()
+  local p = ns.db and ns.db.previewClass
+  if p and ns.SPECS[p] then return p end
+  return ns.RealClass()
 end
+function ns.Previewing()
+  local p = ns.db and ns.db.previewClass
+  return p ~= nil and ns.SPECS[p] ~= nil and p ~= ns.RealClass()
+end
+function ns.ClassSpecs()
+  return ns.SPECS[ns.PlayerClass() or ""] or ns.SPECS.DRUID
+end
+-- does this class have a tank spec (Bear; later Protection Warrior / Paladin)? The Tank focus slider is for those.
+function ns.HasTankSpec()
+  for _, sp in ipairs(ns.ClassSpecs()) do if sp.tank then return true end end
+  return false
+end
+-- does Top Ramen score this class yet?
+function ns.ClassSupported()
+  return ns.SPECS[ns.PlayerClass() or ""] ~= nil
+end
+-- the spec to show: the saved one if it belongs to this class, otherwise the class's first
+function ns.CurrentMode()
+  local m = ns.db and ns.db.windowMode
+  for _, sp in ipairs(ns.ClassSpecs()) do if sp.key == m then return m end end
+  return ns.ClassSpecs()[1].key
+end
+local HUNTER_MODES = { bm = true, mm = true, sv = true }
+ns.HUNTER_MODES = HUNTER_MODES
+-- spec roles: tank, melee, ranged, caster, healer (set on each spec in ns.SPECS; Druid's set here)
+local DRUID_ROLES = { bear = "tank", cat = "melee", balance = "caster", resto = "healer", bm = "ranged", mm = "ranged", sv = "melee" }
+function ns.SpecInfo(mode)
+  for _, list in pairs(ns.SPECS) do for _, s in ipairs(list) do if s.key == mode then return s end end end
+end
+function ns.Role(mode)
+  local s = ns.SpecInfo(mode)
+  return (s and s.role) or DRUID_ROLES[mode] or "melee"
+end
+function ns.IsTank(mode) return ns.Role(mode) == "tank" end
+function ns.IsHealer(mode) return ns.Role(mode) == "healer" end
+function ns.IsCaster(mode) local r = ns.Role(mode); return r == "caster" or r == "healer" end
 function ns.ModeName(mode)
   for _, list in pairs(ns.SPECS) do for _, s in ipairs(list) do if s.key == mode then return s.name end end end
   return mode
@@ -65,6 +123,7 @@ function ns.InitDB()
   TopRamenGearDB = TopRamenGearDB or {}
   local db = TopRamenGearDB
   for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
+  for k, v in pairs(ns.EXTRA_DEFAULTS or {}) do if db[k] == nil then db[k] = v end end
   db.weights = db.weights or {}
   for mode, w in pairs(ns.DEFAULT_W) do
     db.weights[mode] = db.weights[mode] or {}
@@ -98,7 +157,8 @@ end
 local GIS = {
   ITEM_MOD_AGILITY_SHORT = "agi", ITEM_MOD_STRENGTH_SHORT = "str", ITEM_MOD_STAMINA_SHORT = "sta", ITEM_MOD_INTELLECT_SHORT = "int",
   ITEM_MOD_SPIRIT_SHORT = "spi", RESISTANCE0_NAME = "armor", ITEM_MOD_EXTRA_ARMOR_SHORT = "armor", ITEM_MOD_DAMAGE_PER_SECOND_SHORT = "wdps",
-  ITEM_MOD_ATTACK_POWER_SHORT = "ap", ITEM_MOD_FERAL_ATTACK_POWER_SHORT = "fap", ITEM_MOD_HIT_RATING_SHORT = "hit", ITEM_MOD_HIT_MELEE_RATING_SHORT = "hit",
+  ITEM_MOD_ATTACK_POWER_SHORT = "ap", ITEM_MOD_RANGED_ATTACK_POWER_SHORT = "rap",
+  ITEM_MOD_BLOCK_RATING_SHORT = "block", ITEM_MOD_BLOCK_VALUE_SHORT = "blockval", ITEM_MOD_FERAL_ATTACK_POWER_SHORT = "fap", ITEM_MOD_HIT_RATING_SHORT = "hit", ITEM_MOD_HIT_MELEE_RATING_SHORT = "hit",
   ITEM_MOD_CRIT_RATING_SHORT = "crit", ITEM_MOD_CRIT_MELEE_RATING_SHORT = "crit", ITEM_MOD_HASTE_RATING_SHORT = "haste", ITEM_MOD_HASTE_MELEE_RATING_SHORT = "haste",
   ITEM_MOD_EXPERTISE_RATING_SHORT = "exp", ITEM_MOD_DODGE_RATING_SHORT = "dodge", ITEM_MOD_PARRY_RATING_SHORT = "parry", ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = "def",
   ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "sp", ITEM_MOD_SPELL_HEALING_DONE_SHORT = "heal", ITEM_MOD_HEALTH_SHORT = "hp",
@@ -117,11 +177,18 @@ local TT = {
   { "spell haste rating by (%d+)", "shaste" },
   { "damage done by nature spells and effects by up to (%d+)", "spnature" },
   { "damage done by arcane spells and effects by up to (%d+)", "sparcane" },
+  { "damage done by fire spells and effects by up to (%d+)", "spfire" },
+  { "damage done by frost spells and effects by up to (%d+)", "spfrost" },
+  { "damage done by shadow spells and effects by up to (%d+)", "spshadow" },
+  { "damage done by holy spells and effects by up to (%d+)", "spholy" },
+  { "chance to block attacks with a shield by (%d+)%%", "block", 5 }, { "block rating by (%d+)", "block" },
+  { "block value of your shield by (%d+)", "blockval" }, { "^(%d+) block$", "blockval" },
   { "spell penetration by (%d+)", "spen" }, { "magical resistances of your spell targets by (%d+)", "spen" },
   { "healing done by spells and effects by up to (%d+)", "heal" },
   { "^%+?(%d+) armor$", "armor" }, { "^%+(%d+) agility$", "agi" }, { "^%+(%d+) strength$", "str" }, { "^%+(%d+) stamina$", "sta" },
   { "^%+(%d+) intellect$", "int" }, { "^%+(%d+) spirit$", "spi" }, { "%(([%d%.]+) damage per second%)", "wdps" },
   { "attack power by (%d+) in cat, bear", "fap" }, { "%+(%d+) attack power in cat, bear", "fap" },
+  { "ranged attack power by (%d+)", "rap" }, { "^%+(%d+) ranged attack power", "rap" },
   { "^equip: %+(%d+) attack power%.?$", "ap" }, { "^equip: increases attack power by (%d+)%.?$", "ap" },
   { "increased defense %+(%d+)", "def" }, { "increases defense rating by (%d+)", "def" }, { "increases defense skill by (%d+)", "def" },
   { "increases defense by (%d+)", "def" }, { "^equip: %+(%d+) defense%.?$", "def" },
@@ -138,20 +205,52 @@ local LOC2S = {
   INVTYPE_HEAD = "head", INVTYPE_NECK = "neck", INVTYPE_SHOULDER = "shoulder", INVTYPE_CLOAK = "back", INVTYPE_CHEST = "chest", INVTYPE_ROBE = "chest",
   INVTYPE_WRIST = "wrist", INVTYPE_HAND = "hands", INVTYPE_WAIST = "waist", INVTYPE_LEGS = "legs", INVTYPE_FEET = "feet", INVTYPE_FINGER = "finger",
   INVTYPE_TRINKET = "trinket", INVTYPE_2HWEAPON = "weapon2h", INVTYPE_WEAPON = "weapon1h", INVTYPE_WEAPONMAINHAND = "weapon1h",
-  INVTYPE_HOLDABLE = "offhand", INVTYPE_RELIC = "relic",
+  INVTYPE_HOLDABLE = "offhand", INVTYPE_RELIC = "relic", INVTYPE_WEAPONOFFHAND = "offweapon",
+  INVTYPE_RANGED = "ranged", INVTYPE_RANGEDRIGHT = "ranged", INVTYPE_THROWN = "ranged", INVTYPE_SHIELD = "shield",
 }
 ns.LOC2S = LOC2S
--- staves, maces (1H/2H), polearms, fist weapons, daggers
-local DRUID_WEAPONS = { [4] = true, [5] = true, [6] = true, [10] = true, [13] = true, [15] = true }
+-- What each class can wear. Weapon subclasses: 0 axe, 1 2h axe, 2 bow, 3 gun, 4 mace, 5 2h mace, 6 polearm,
+-- 7 sword, 8 2h sword, 10 staff, 13 fist, 15 dagger, 16 thrown, 18 crossbow, 19 wand.
+-- Armor: 1 cloth, 2 leather, 3 mail, 4 plate, 6 shield; relics: 7 libram (Paladin), 8 idol (Druid), 9 totem (Shaman).
+-- armor = best armor type, and the level you can wear it from (the type below until then).
+local function set(list) local t = {} for _, v in ipairs(list) do t[v] = true end return t end
+ns.CLASS_RULES = {
+  DRUID   = { armor = 2, weapons = set({ 4, 5, 6, 10, 13, 15 }), relic = 8, offhand = true },
+  HUNTER  = { armor = 3, armorAt = 40, weapons = set({ 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18 }), ranged = true, dual = true, offhand = true },
+  WARRIOR = { armor = 4, armorAt = 40, weapons = set({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18 }), ranged = true, dual = true, shield = true },
+  PALADIN = { armor = 4, armorAt = 40, weapons = set({ 0, 1, 4, 5, 6, 7, 8 }), relic = 7, shield = true, offhand = true },
+  ROGUE   = { armor = 2, weapons = set({ 2, 3, 4, 7, 13, 15, 16, 18 }), ranged = true, dual = true },
+  PRIEST  = { armor = 1, weapons = set({ 4, 10, 15, 19 }), ranged = true, offhand = true },
+  SHAMAN  = { armor = 3, armorAt = 40, weapons = set({ 0, 1, 4, 5, 10, 13, 15 }), relic = 9, shield = true, offhand = true },
+  MAGE    = { armor = 1, weapons = set({ 7, 10, 15, 19 }), ranged = true, offhand = true },
+  WARLOCK = { armor = 1, weapons = set({ 7, 10, 15, 19 }), ranged = true, offhand = true },
+}
+local function myClass() return ns.PlayerClass() or "DRUID" end
 
--- Can a Druid use this kind of item? Returns the slot group, or nil.
-function ns.DruidSlot(equipLoc, classID, subclassID)
+-- Can this character use this kind of item? Returns the slot group, or nil.
+function ns.ClassSlot(equipLoc, classID, subclassID)
   local s = LOC2S[equipLoc or ""]
   if not s then return nil end
-  if classID == 4 and (subclassID == 3 or subclassID == 4 or subclassID == 6) then return nil end -- mail, plate, shield
-  if classID == 2 and not DRUID_WEAPONS[subclassID] then return nil end
+  local class = myClass()
+  local R = ns.CLASS_RULES[class] or ns.CLASS_RULES.DRUID
+  if s == "ranged" and not R.ranged then return nil end
+  if s == "offweapon" and not R.dual then return nil end
+  if s == "shield" and not R.shield then return nil end
+  if s == "offhand" and not R.offhand then return nil end
+  if s == "relic" and not R.relic then return nil end
+  if classID == 4 then
+    if subclassID == 6 then return R.shield and s or nil end
+    if s == "relic" then return (subclassID == R.relic or subclassID == 0) and s or nil end
+    if subclassID and subclassID >= 1 and subclassID <= 4 then
+      local best = R.armor
+      if R.armorAt and (ns.Level() or 1) < R.armorAt then best = best - 1 end
+      if subclassID > best then return nil end
+    end
+  end
+  if classID == 2 and not R.weapons[subclassID] then return nil end
   return s
 end
+ns.DruidSlot = ns.ClassSlot
 
 local cache, recheck = {}, {}
 function ns.ClearCache() wipe(cache) end
@@ -164,7 +263,7 @@ function ns.ItemStats(link)
   if c ~= nil then return c or nil end
   local name, _, quality, _, reqLevel, _, _, _, equipLoc, _, _, classID, subclassID = GetInfo(link)
   if not name then return nil end -- not loaded yet: don't cache
-  local slot = ns.DruidSlot(equipLoc, classID, subclassID)
+  local slot = ns.ClassSlot(equipLoc, classID, subclassID)
   if not slot then cache[link] = false; return nil end
 
   local st = {}
@@ -216,8 +315,11 @@ function ns.ItemStats(link)
     end
   end
   if st.wdps then st.wdps = math.floor(st.wdps * 100 + 0.5) / 100 end
+  -- a bow, gun, crossbow or thrown weapon: its damage per second is ranged weapon DPS
+  if slot == "ranged" and st.wdps then st.rwdps = st.wdps; st.wdps = nil end
   local id = tonumber(link:match("item:(%d+)"))
-  local it = { id = id, link = link, name = name, q = quality, rl = reqLevel or 0, s = slot, st = st, fx = (#fx > 0) and fx or nil }
+  local it = { id = id, link = link, name = name, q = quality, rl = reqLevel or 0, s = slot, st = st, fx = (#fx > 0) and fx or nil,
+               loc = equipLoc }
   -- weapons and anything with an effect line get read again shortly, in case part of the text was still loading;
   -- after that the result is kept
   if pending then return it end
@@ -234,9 +336,17 @@ end
 ---------------------------------------------------------------------------
 -- proc and use effects (estimates, same rules as the website)
 ---------------------------------------------------------------------------
-local FORM_SPEED = { cat = 1.0, bear = 2.5 }
-local function hitsPerMin(mode, scen) if mode == "cat" then return 90 end return scen == 3 and 84 or 34 end
-local function hitsTakenPerMin(mode, scen) if mode == "bear" then return scen == 3 and 60 or 25 end return 0 end
+local FORM_SPEED = setmetatable({ cat = 1.0, bear = 2.5, bm = 2.8, mm = 2.8, sv = 2.6 }, { __index = function() return 2.6 end })
+local function hitsPerMin(mode, scen)
+  if mode == "cat" then return 90 end
+  local sp = ns.SpecInfo(mode)
+  if sp and sp.hpm then return sp.hpm end            -- e.g. dual wielders swing more often
+  local role = ns.Role(mode)
+  if role == "ranged" then return 4 end              -- ranged specs rarely swing a melee weapon
+  if role == "melee" then return 40 end
+  return scen == 3 and 84 or 34                      -- tanks (Bear: Swipe on 3 targets)
+end
+local function hitsTakenPerMin(mode, scen) if ns.IsTank(mode) then return scen == 3 and 60 or 25 end return 0 end
 ns.CTX = { wdps = 0, ap = 0 } -- equipped weapon DPS and attack power, for extra-attack procs
 
 local function cdFromText(d)
@@ -286,7 +396,7 @@ ns.parseEffect = parseEffect
 
 function ns.EffectStats(it, mode, scen)
   if not it or not it.fx then return nil end
-  if mode == "balance" or mode == "resto" then return nil end -- melee procs and use effects don't help a caster (yet)
+  if ns.IsCaster(mode) then return nil end -- melee procs and use effects don't help a caster or healer (yet)
   local out, S, any = {}, FORM_SPEED[mode], false
   local function add(st, f) for k, v in pairs(st) do out[k] = (out[k] or 0) + v * f; any = true end end
   for _, f in ipairs(it.fx) do
@@ -326,8 +436,8 @@ local THREAT = { wdps = 1, str = 1, ap = 1, fap = 1, hit = 1, exp = 1, crit = 1,
 -- and with your talents applied: "+20% Stamina in Bear Form" makes Stamina on gear worth 20% more for Bear
 function ns.Weights(mode)
   local w = ns.db.weights[mode]
-  local f = mode == "bear" and (ns.db.bearFocus or 0) / 100 or 0
-  local tal = (ns.db.useTalents ~= false and ns.TalentMods and ns.TalentMods[mode]) or {}
+  local f = ns.IsTank(mode) and (ns.db.bearFocus or 0) / 100 or 0
+  local tal = (ns.db.useTalents ~= false and not ns.Previewing() and ns.TalentMods and ns.TalentMods[mode]) or {}
   local liveArmor = mode == "bear" and ns.LiveArmorWeight(w) or nil
   local out = {}
   for k, v in pairs(w) do
@@ -339,17 +449,42 @@ function ns.Weights(mode)
   end
   -- Agility is worth what it does at your level (Forever's character sheet, level 32 Bear:
   -- 112 Agility = 9.8% crit and 9.8% dodge, 224 armor, and 1 attack power each in Cat Form)
-  if mode == "balance" or mode == "resto" then
+  if ns.IsCaster(mode) then
     -- Intellect gives spell crit (60 per 1% at level 60; about 31 per 1% at level 32 on your sheet)
     out.int = (out.int or 0) + ns.IntPctPerPoint() * CRIT_RATING_PER_PCT * (out.scrit or 0)
+    ns.ConvertTalents(out, tal)
     return out
   end
   local pct = ns.AgiPctPerPoint()
+  local class = ns.PlayerClass()
+  if class ~= "DRUID" then
+    -- Agility: melee attack power (Hunters, Rogues), ranged attack power, 2 armor, crit (and dodge).
+    -- What 1 melee attack power is worth = the Strength weight / attack power per Strength.
+    local T = ns.StatTable(class)
+    local meleeAP = (out.str or 0) / math.max(1, T.str or 1)
+    out.agi = (T.agiAP or 0) * meleeAP + (T.agiRAP or 0) * (out.rap or 0) + 2 * (out.armor or 0)
+      + pct * CRIT_RATING_PER_PCT * (out.crit or 0) + pct * DODGE_RATING_PER_PCT * (out.dodge or 0)
+    ns.ConvertTalents(out, tal)
+    return out
+  end
   out.agi = (mode == "cat" and (out.ap or 0) or 0)
     + 2 * (out.armor or 0) / FormArmorMultiplier(mode)
     + pct * CRIT_RATING_PER_PCT * (out.crit or 0)
     + pct * DODGE_RATING_PER_PCT * (out.dodge or 0)
   return out
+end
+
+-- talents that turn Intellect or Spirit into power: that stat is also worth what it turns into
+-- (Careful Aim / Mental Dexterity: attack power; Mental Quickness, Champion of the Light: spell damage;
+-- Natural Instinct, Spiritual Guidance: healing)
+function ns.ConvertTalents(out, tal)
+  if not tal then return end
+  local ap = math.max(out.ap or 0, out.rap or 0)
+  if tal.int2ap then out.int = (out.int or 0) + tal.int2ap * ap end
+  if tal.int2sp then out.int = (out.int or 0) + tal.int2sp * (out.sp or 0) end
+  if tal.int2heal then out.int = (out.int or 0) + tal.int2heal * (out.heal or 0) end
+  if tal.spi2sp then out.spi = (out.spi or 0) + tal.spi2sp * (out.sp or 0) end
+  if tal.spi2heal then out.spi = (out.spi or 0) + tal.spi2heal * (out.heal or 0) end
 end
 
 -- Bear Form raises armor from items (+180%, or +360% in Dire Bear Form from level 40), and the armor
@@ -410,22 +545,21 @@ function ns.LiveArmorWeight(w)
   return (w.sta or 2) * perItemArmor / perSta
 end
 
--- % spell crit per point of Intellect, by level (your sheet: 92 Intellect = 3.0% at level 32; the guide: 60 per 1% at 60)
+-- % spell crit per point of Intellect at your level, for your class (Stats.lua: foreverdb.net's tables
+-- from the Forever client; your own Druid sheet matched them: 92 Intellect = 3.0% at level 32)
 function ns.IntPctPerPoint()
-  local lvl = (ns.Level and ns.Level()) or 60
-  lvl = math.max(1, math.min(60, lvl))
-  local intPer1 = 30.7 + (60 - 30.7) * (lvl - 32) / (60 - 32)
-  return 1 / math.max(8, intPer1)
+  local per1 = ns.IntPer1(ns.PlayerClass(), (ns.Level and ns.Level()) or 60)
+  if not per1 then return 0 end -- a class without mana gets no spell crit from Intellect
+  return 1 / math.max(4, per1)
 end
 
--- % crit (and dodge) per point of Agility. Read from the game when it can tell us; otherwise
--- estimated from your level: 11.4 Agility per 1% at level 32 (measured), 20 per 1% at level 60.
+-- % crit per point of Agility. Read from the game when it can tell us (your own class); otherwise from
+-- Stats.lua's table for your class and level (your sheets matched it: Druid level 32, Hunter level 42)
 function ns.AgiPctPerPoint()
-  if ns.agiPct then return ns.agiPct end
-  local lvl = (ns.Level and ns.Level()) or 60
-  lvl = math.max(1, math.min(60, lvl))
-  local agiPer1 = 11.43 + (20 - 11.43) * (lvl - 32) / (60 - 32)
-  return 1 / math.max(4, agiPer1)
+  -- (previewing another class: your own character's live figure is for the wrong class)
+  if ns.agiPct and not ns.Previewing() then return ns.agiPct end
+  local per1 = ns.AgiPer1(ns.PlayerClass(), (ns.Level and ns.Level()) or 60)
+  return 1 / math.max(2, per1 or 20)
 end
 
 local HIT_PER_PCT = 10
@@ -435,8 +569,10 @@ local function caps(mode)
     -- hit you still need from gear: the cap, less hit from talents (read from the game) and any extra you entered
     hit = math.max(0, (db.capHit or 0) - (db.talHit or 0) - ((db.useTalents ~= false and ns.TalentMods and ns.TalentMods.hit) or 0)) * HIT_PER_PCT,
     exp = (db.capExp or 0) * 10, -- % -> points (10 per 1%, like hit)
-    shit = mode == "balance" and math.max(0, (db.capSpellHit or 17) - ((db.useTalents ~= false and ns.TalentMods and ns.TalentMods.spellHit) or 0)) * HIT_PER_PCT or 0,
-    def = mode == "bear" and (db.capDef or 0) or 0,
+    shit = ns.IsCaster(mode) and math.max(0, (db.capSpellHit or 17) - ((db.useTalents ~= false and ns.TalentMods and ns.TalentMods.spellHit) or 0)) * HIT_PER_PCT or 0,
+    -- (Defense from talents, e.g. Anticipation +20, is already yours: gear needs that much less)
+    def = ns.IsTank(mode) and math.max(0, (db.capDef or 0) - 100 * ((db.useTalents ~= false and not ns.Previewing()
+      and ns.TalentMods and ns.TalentMods[mode] and ns.TalentMods[mode].defskill) or 0)) or 0,
   }
 end
 local function capped(cap, base, add)
@@ -452,12 +588,12 @@ function ns.Score(items, mode, base, scen)
     if it then
       for k, v in pairs(it.st) do sum[k] = (sum[k] or 0) + v end
       -- healing: an item's "+healing" line, or else its "+damage and healing" (spell power) heals too
-      if mode == "resto" and not it.st.heal and it.st.sp then sum.heal = (sum.heal or 0) + it.st.sp end
+      if ns.IsHealer(mode) and not it.st.heal and it.st.sp then sum.heal = (sum.heal or 0) + it.st.sp end
       local ex = ns.EffectStats(it, mode, scen or 1)
       if ex then for k, v in pairs(ex) do sum[k] = (sum[k] or 0) + v end end
     end
   end
-  if mode == "balance" or mode == "resto" then
+  if ns.IsCaster(mode) then
     for _, pair in ipairs({ { "hit", "shit" }, { "crit", "scrit" }, { "haste", "shaste" } }) do
       if sum[pair[1]] then sum[pair[2]] = (sum[pair[2]] or 0) + sum[pair[1]]; sum[pair[1]] = nil end
     end
@@ -471,6 +607,20 @@ function ns.Score(items, mode, base, scen)
     else s = s + (w[k] or 0) * v end
   end
   return s
+end
+
+-- the same item worn in the off hand: its weapon DPS counts as off-hand DPS (half-damage hits)
+local offCache = setmetatable({}, { __mode = "k" })
+function ns.AsOffhand(it)
+  if not it or not it.st or not it.st.wdps then return it end
+  local c = offCache[it]
+  if c then return c end
+  local st = {}
+  for k, v in pairs(it.st) do st[k] = v end
+  st.ohwdps, st.wdps = st.wdps, nil
+  c = setmetatable({ st = st, offhandOf = it }, { __index = it })
+  offCache[it] = c
+  return c
 end
 
 function ns.Totals(items, out)

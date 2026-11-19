@@ -2,10 +2,18 @@
 ## Title: Top Ramen Explorer
 ## Notes: /tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.
 ## Author: Top Ramen
-## Version: 1.2.1
-## SavedVariables: TopRamenExplorerDB
+## Version: 1.2.2
+## SavedVariables: TopRamenExplorerDB, TopRamenLauncherDB
 ## OptionalDeps: TomTom
 ## IconTexture: Interface\AddOns\TopRamenExplorer\Media\trIcon
+## AddonCompartmentFunc: TopRamenExplorer_TRLaunch
+## X-TR-Letter: E
+## X-TR-Label: Explorer
+## X-TR-Cmd: /tre
+## X-TR-Slash: TOPRAMENEXPLORER
+## X-TR-Color: 4ade80
+## X-TR-Icon: INV_Misc_Spyglass_03
+## X-TR-Order: 3
 
 Core.lua
 TRUI.lua
@@ -15,3 +23,4 @@ Cataclysm.lua
 Share.lua
 Pins.lua
 Window.lua
+TRLauncher.lua

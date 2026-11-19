@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENMAP_OPEN" header="TOPRAMENMAP" category="ADDONS">
+    TopRamenMap_TRLaunch()
+  </Binding>
+</Bindings>

@@ -21,7 +21,7 @@ local function forMe(faction, classOnly)
   local myFaction = UnitFactionGroup and UnitFactionGroup("player")
   if faction and faction ~= "Both" and myFaction and faction ~= myFaction then return false end
   if classOnly then
-    local _, myClass = UnitClass("player")
+    local myClass = ns.PlayerClass()
     if type(classOnly) == "table" then
       local ok = false
       for _, c in pairs(classOnly) do if c == myClass then ok = true end end
@@ -134,7 +134,8 @@ local C, HX = UI.C, UI.HEX
 local HEAD_H = 58
 local SLOTNAME = { head = "Head", neck = "Neck", shoulder = "Shoulder", back = "Back", chest = "Chest", wrist = "Wrist",
   hands = "Hands", waist = "Waist", legs = "Legs", feet = "Feet", finger = "Ring", trinket = "Trinket",
-  weapon2h = "Two-hand", weapon1h = "One-hand", offhand = "Off-hand", relic = "Idol" }
+  weapon2h = "Two-hand", weapon1h = "One-hand", offhand = "Off-hand", relic = "Relic",
+  ranged = "Ranged", offweapon = "Off-hand weapon", shield = "Shield" }
 local cards, specs, heads = {}, nil, {}
 
 local function fmt(d)
@@ -204,7 +205,7 @@ local TAGCOL = { Boss = { { 0.23, 0.11, 0.11 }, { 0.99, 0.65, 0.65 } }, Quest = 
 
 function ns.RenderDungeons()
   if not page or not page:IsShown() then return end
-  local mode = ns.db.windowMode or "bear"
+  local mode = ns.CurrentMode()
   if specs then specs:Update(mode) end
   local f = page:GetParent()
   if f and f.who then f.who:SetText(UI.WhoAmI()) end
@@ -279,7 +280,7 @@ function ns.RenderDungeons()
   local msg
   if ups == 0 then
     msg = count > 0 and ("Nothing in " .. name .. " beats what you're wearing for " .. ns.ModeName(mode) .. ".")
-      or "No Druid gear here."
+      or "Nothing here you can use."
   else
     msg = "Loot lists from DungeonJournal · hover any item for its tooltip"
     if #list > 8 then msg = msg .. " · scroll for more" end
