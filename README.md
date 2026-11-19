@@ -33,7 +33,7 @@ Download an addon's zip from [`releases/`](releases/) and unzip it into `World o
 
 **Test or released?** `channels.json` lists the addons that are still in testing. Only people who tick "Show test addons" see those. To release one to everyone, remove its name from that list and run the build again.
 
-To rebuild the launcher: raise `launcher/VERSION`, run `sh tools/build_launcher.sh` (needs Go), then `python3 tools/build_release.py`, and push. Older launchers will show a "new launcher available" notice.
+To release a new launcher: raise `launcher/VERSION` and push. The **Sign launcher** GitHub workflow builds it on Windows, signs it with Azure Artifact Signing (so Windows Smart App Control allows it), and commits the signed `.exe`, `.zip` and `manifest.json`. Older launchers then show a "new launcher available" notice. Don't commit an unsigned build from `tools/build_launcher.sh` over the signed one: that script is only for local testing.
 
 ## What the launcher touches
 
