@@ -31,11 +31,11 @@
     {
       "folder": "TopRamenGear",
       "title": "Top Ramen Gear",
-      "version": "1.14.1",
-      "notes": "/trg opens your Druid gear window (Bear, Cat, Balance, Restoration); item tooltips show upgrade scores. /trg help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.14.1.zip",
-      "size": 96634,
-      "sha256": "bd9455d25861ca2f2e90c86dfbe42e4ffc0ea6e76856e53d61f7061a048127fa"
+      "version": "1.14.2",
+      "notes": "/trg opens your class gear window, separated by spec. See what gear in your bags is the best while also getting an easy-to-use hunt list for items in any future dungeons. Not sure how much of an upgrade a dungeon drop is? Now you can compare the level of upgrade to anyone else who has the addon!",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.14.2.zip",
+      "size": 96723,
+      "sha256": "4a128a7b52a92d5eba3e9121d965203ac3793872980a3174583d96ebb5f09b11"
     }
   ],
   "testAddons": [

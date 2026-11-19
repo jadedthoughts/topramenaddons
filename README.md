@@ -4,7 +4,7 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 
 | Addon | Command | What it does |
 |---|---|---|
-| Top Ramen Gear | `/trg` | Druid gear window (Bear, Cat, Balance, Restoration) and upgrade scores on item tooltips |
+| Top Ramen Gear | `/trg` | Gear window for your class, by spec: best gear in your bags, a hunt list for upcoming dungeon drops, and upgrade comparisons with other addon users |
 | Top Ramen Crafting | `/trc` | Crafting planner: what to craft to level up, what makes money, what to buy |
 | Top Ramen Explorer | `/tre` | Finds the spots you still need for the Adventure > Explorer achievements |
 | Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house |
