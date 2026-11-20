@@ -400,6 +400,23 @@ end
 function ns.RollTest(arg)
   local link = arg and arg:match("|H(item:[^|]+)|h") and arg:match("(|c%x+|Hitem:.-|h.-|h|r)")
   local party = arg and arg:lower():match("^%s*%S*%s*party") and channel() ~= nil
+  -- a typed item name ("/trg rolltest party Rune-Etched Epaulets"): look for it in your bags and on you
+  local typed = arg and not link and arg:match("^%s*%S+%s+party%s+(.-)%s*$") or (arg and not link and arg:match("^%s*rolltest%s+(.-)%s*$"))
+  if typed and typed:lower() == "party" then typed = nil end
+  if typed and typed ~= "" then
+    local want = typed:lower():gsub("^%[", ""):gsub("%]$", "")
+    local function check(l) if l and not link then local n = itemInfo(l); if n and n:lower() == want then link = l end end end
+    if C_Container then
+      for bag = 0, 4 do
+        for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do check(C_Container.GetContainerItemLink(bag, slot)) end
+      end
+    end
+    for slot = 1, 19 do check(GetInventoryItemLink and GetInventoryItemLink("player", slot)) end
+    if not link then
+      print(GOLD .. "Top Ramen:|r couldn't find \"" .. typed .. "\" in your bags or on you. Shift-click the item to put its link after the command instead.")
+      return
+    end
+  end
   if not link and C_Container then
     for bag = 0, 4 do
       for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do

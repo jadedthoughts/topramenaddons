@@ -469,6 +469,7 @@ ns.RunExport = runExport
 ns.RunLoot = function() runLoot(1) end
 
 SlashCmdList.TOPRAMEN = function(msg)
+  ns.rawSlash = msg or "" -- as typed: item links break when lowercased
   msg = (msg or ""):lower()
   if msg:match("^%s*loot") then runLoot(1); return end
   if msg:match("^%s*export") then runExport(); return end

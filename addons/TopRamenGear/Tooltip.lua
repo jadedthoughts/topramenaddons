@@ -293,7 +293,7 @@ function ns.Command(msg)
     if ns.PartyStatus then ns.PartyStatus() end
     return true
   elseif cmd == "rolltest" then
-    if ns.RollTest then ns.RollTest(msg) end
+    if ns.RollTest then ns.RollTest(ns.rawSlash or msg) end
     return true
   elseif cmd == "hitcap" then
     local n = tonumber(arg)
