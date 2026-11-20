@@ -224,7 +224,7 @@ function ns.Command(msg)
     say("/trg bear, /trg cat, /trg balance, /trg resto - show or hide that line (now Bear " .. onOff(db.showBear) .. ", Cat " .. onOff(db.showCat) .. ", Balance " .. onOff(db.showBalance) .. ", Restoration " .. onOff(db.showResto) .. ")")
     say("/trg 3t - show or hide the Bear 3-target score (now " .. onOff(db.showBear3) .. ")")
     say("/trg focus <-100 to 100> - Bear focus, survival (-) to threat (+) (now " .. (db.bearFocus or 0) .. ")")
-    say("/trg hitcap <percent> - hit cap (now " .. (db.capHit or 0) .. "%)")
+    say("/trg hitcap <percent> - your own hit cap (now " .. ns.CapValue("capHit") .. "%; sets caps to Custom)")
     return true
   elseif cmd == "usetalents" then
     db.useTalents = not (db.useTalents ~= false)
@@ -282,8 +282,8 @@ function ns.Command(msg)
     return true
   elseif cmd == "hitcap" then
     local n = tonumber(arg)
-    if n then db.capHit = math.max(0, n) end
-    say("hit cap " .. (db.capHit or 0) .. "%")
+    if n then db.capHit = math.max(0, n); db.capTarget = "custom"; if ns.ClearScores then ns.ClearScores() end end
+    say("hit cap " .. ns.CapValue("capHit") .. "%" .. (n and " (caps set to Custom)" or ""))
     return true
   end
   return false

@@ -99,21 +99,21 @@ W.pprot  = { sta = 2.0, armor = 0.1, def = 1.8, dodge = 0.85, parry = 0.8, block
              crit = 0.5, haste = 0.4, wdps = 4,
              fireres = 0.2, natureres = 0.2, frostres = 0.2, shadowres = 0.2, arcaneres = 0.2 }
 -- casters: sp = all spell damage; school damage (spfire...) counts by how much of the spec's damage is that school
-W.arcane = { sp = 1, sparcane = 0.7, spfire = 0.3, shit = 1.1, scrit = 0.8, shaste = 0.7, spen = 0.6, int = 0.4,
+W.arcane = { sp = 1, sparcane = 0.7, spfire = 0.3, shit = 1.1, scrit = 0.8, shaste = 0.7, spen = 0.1, int = 0.4,
              mp5 = 0.5, spi = 0.25, sta = 0.05, rwdps = 0.5 }
-W.fire   = { sp = 1, spfire = 1, shit = 1.1, scrit = 0.9, shaste = 0.75, spen = 0.6, int = 0.25, mp5 = 0.4,
+W.fire   = { sp = 1, spfire = 1, shit = 1.1, scrit = 0.9, shaste = 0.75, spen = 0.1, int = 0.25, mp5 = 0.4,
              spi = 0.15, sta = 0.05, rwdps = 0.5 }
-W.frost  = { sp = 1, spfrost = 1, shit = 1.1, scrit = 0.75, shaste = 0.7, spen = 0.6, int = 0.25, mp5 = 0.45,
+W.frost  = { sp = 1, spfrost = 1, shit = 1.1, scrit = 0.75, shaste = 0.7, spen = 0.1, int = 0.25, mp5 = 0.45,
              spi = 0.15, sta = 0.05, rwdps = 0.5 }
-W.affl   = { sp = 1, spshadow = 1, shit = 1.1, scrit = 0.7, shaste = 0.75, spen = 0.6, int = 0.2, spi = 0.25,
+W.affl   = { sp = 1, spshadow = 1, shit = 1.1, scrit = 0.7, shaste = 0.75, spen = 0.1, int = 0.2, spi = 0.25,
              mp5 = 0.3, sta = 0.1, rwdps = 0.5 }
-W.demo   = { sp = 1, spshadow = 0.8, spfire = 0.2, shit = 1.1, scrit = 0.75, shaste = 0.65, spen = 0.5, int = 0.2,
+W.demo   = { sp = 1, spshadow = 0.8, spfire = 0.2, shit = 1.1, scrit = 0.75, shaste = 0.65, spen = 0.1, int = 0.2,
              spi = 0.2, mp5 = 0.3, sta = 0.15, rwdps = 0.5 }
-W.destro = { sp = 1, spfire = 0.5, spshadow = 0.5, shit = 1.1, scrit = 0.85, shaste = 0.7, spen = 0.7, int = 0.2,
+W.destro = { sp = 1, spfire = 0.5, spshadow = 0.5, shit = 1.1, scrit = 0.85, shaste = 0.7, spen = 0.1, int = 0.2,
              spi = 0.25, mp5 = 0.3, sta = 0.1, rwdps = 0.5 }
-W.shadow = { sp = 1, spshadow = 1, shit = 1.1, scrit = 0.9, shaste = 0.7, spen = 0.6, int = 0.25, spi = 0.25,
+W.shadow = { sp = 1, spshadow = 1, shit = 1.1, scrit = 0.9, shaste = 0.7, spen = 0.1, int = 0.25, spi = 0.25,
              mp5 = 0.35, sta = 0.1, rwdps = 0.5 }
-W.ele    = { sp = 1, spnature = 0.7, spfire = 0.3, shit = 1.1, scrit = 0.8, shaste = 0.7, spen = 0.6, int = 0.25,
+W.ele    = { sp = 1, spnature = 0.7, spfire = 0.3, shit = 1.1, scrit = 0.8, shaste = 0.7, spen = 0.1, int = 0.25,
              mp5 = 0.45, spi = 0.15, sta = 0.05 }
 -- healers: heal = +healing; an item's "+damage and healing" counts as healing (see ns.Score)
 W.pholy  = { heal = 1, int = 0.5, spi = 0.3, mp5 = 0.6, scrit = 0.55, shaste = 0.45, sta = 0.1 }

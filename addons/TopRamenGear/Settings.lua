@@ -229,7 +229,7 @@ function ns.BuildSettings(p)
   if anchor.isTRButton then rl:SetPoint("LEFT", anchor, "RIGHT", 6, 0) else rl:SetPoint("LEFT", anchor, "RIGHT", -8, 2) end
 
   -- Bear focus and caps
-  local c2 = card(content, "Tank focus", 300)
+  local c2 = card(content, "Tank focus", 330)
   local fnote = note(c2, "For tank specs (Bear): survival (Stamina, Armor, Defense, Dodge) or threat (damage, Strength, hit).", 16, -32, 300)
   slider = focusSlider(c2, 24, -86)
   -- no tank spec for this class (yet): show the slider greyed out and disabled
@@ -243,11 +243,58 @@ function ns.BuildSettings(p)
   end
   local capsHead = UI.Heading(c2, "Caps")
   capsHead:SetPoint("TOPLEFT", 14, -122)
-  capRow(c2, "capHit", "Hit cap %", -146, changed)
-  capRow(c2, "capExp", "Expertise cap %", -176, changed)
-  capRow(c2, "capDef", "Tank Defense cap", -206, changed)
-  capRow(c2, "capSpellHit", "Spell hit cap %", -236, changed)
-  capRow(c2, "talHit", "Extra hit % (not talents)", -266, changed)
+  -- who you're fighting decides the hit and expertise caps
+  local ctl = c2:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  ctl:SetPoint("TOPLEFT", 16, -150); ctl:SetText("Caps for")
+  local function targetText()
+    local t = ns.db.capTarget or "auto"
+    for _, o in ipairs(ns.CAP_TARGETS) do
+      if o.key == t then
+        if t == "auto" then
+          local now = ns.CapTarget() == "raid" and "raid bosses" or "my level"
+          return o.text .. " (" .. now .. ")"
+        end
+        return o.text
+      end
+    end
+    return "Automatic"
+  end
+  local capRows = {}
+  local tbtn = UI.Button(c2, 180, 22, targetText(), function(self)
+    local t, idx = ns.db.capTarget or "auto", 1
+    for i, o in ipairs(ns.CAP_TARGETS) do if o.key == t then idx = i end end
+    ns.db.capTarget = ns.CAP_TARGETS[idx % #ns.CAP_TARGETS + 1].key
+    ns.RefreshSettings(); changed()
+    if GameTooltip:IsOwned(self) and self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
+  end)
+  tbtn:SetPoint("TOPRIGHT", -18, -146)
+  tbtn:HookScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Caps for (click to change)", 1, 0.82, 0)
+    for _, o in ipairs(ns.CAP_TARGETS) do
+      local on = o.key == (ns.db.capTarget or "auto")
+      GameTooltip:AddDoubleLine((on and "> " or "   ") .. o.text, o.tip, on and 1 or 0.8, on and 0.82 or 0.8, on and 0 or 0.8, 0.8, 0.8, 0.8)
+    end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("WoW Forever caps (spells / attacks / dodge): my level 4 / 5 / 5%, dungeon +2 6 / 5.4 / 6%, raid boss 17 / 8 / 6.5%.", 0.7, 0.7, 0.7, true)
+    GameTooltip:Show()
+  end)
+  tbtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  capRows.capHit = capRow(c2, "capHit", "Hit cap %", -176, changed)
+  capRows.capExp = capRow(c2, "capExp", "Expertise cap %", -206, changed)
+  capRow(c2, "capDef", "Tank Defense cap", -236, changed)
+  capRows.capSpellHit = capRow(c2, "capSpellHit", "Spell hit cap %", -266, changed)
+  capRow(c2, "talHit", "Extra hit % (not talents)", -296, changed)
+  -- outside Custom the three boxes show the cap in use, greyed out (they run after the boxes' own refresh)
+  controls[#controls + 1] = function()
+    if tbtn.label then tbtn.label:SetText(targetText()) elseif tbtn.SetText then tbtn:SetText(targetText()) end
+    local custom = (ns.db.capTarget or "auto") == "custom"
+    for key, e in pairs(capRows) do
+      e:SetText(tostring(ns.CapValue(key)))
+      if custom then e:Enable() else e:Disable() end
+      e:SetAlpha(custom and 1 or 0.55); e.__label:SetAlpha(custom and 1 or 0.55)
+    end
+  end
 
   -- Dungeons tab defaults
   local c3 = card(content, "Dungeons tab", 124)

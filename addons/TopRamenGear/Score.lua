@@ -19,7 +19,7 @@ ns.DEFAULT_W = {
   -- Balance: per point, spell power = 1. Order from the Wowhead Forever Balance guide:
   -- hit (to the cap) > spell damage > spell penetration > crit > haste > Intellect > Spirit > Stamina.
   -- Wrath is Nature and Starfire Arcane, so school damage counts for about half each.
-  balance = { sp = 1.0, spnature = 0.5, sparcane = 0.5, shit = 1.1, spen = 0.85, scrit = 0.8, shaste = 0.7,
+  balance = { sp = 1.0, spnature = 0.5, sparcane = 0.5, shit = 1.1, spen = 0.1, scrit = 0.8, shaste = 0.7,
               int = 0.2, spi = 0.15, mp5 = 0.4, sta = 0.05, heal = 0, wdps = 0, str = 0, agi = 0, ap = 0, fap = 0,
               hit = 0, crit = 0, haste = 0, exp = 0, armor = 0, def = 0, dodge = 0, parry = 0, wskill = 0, hp = 0,
               holyres = 0, fireres = 0, natureres = 0, frostres = 0, shadowres = 0, arcaneres = 0 },
@@ -56,6 +56,7 @@ local DEFAULTS = {
   capSpellHit = 17,    -- spell hit cap vs bosses (Wowhead Forever guide: 16% miss, 17% never misses)
   bearFocus = 0,       -- -100 survival .. +100 threat
   capHit = 8, talHit = 0, capExp = 6.5, capDef = 140,
+  capTarget = "auto", -- hit and expertise caps for: auto (my level until 60, then raid), level, dungeon, raid, custom
   useTalents = true,   -- apply your talents to the scores
   dgWithinDefault = false, dgWithinLevels = 5, dgShowAllDefault = false, dgMineDefault = true, -- Dungeons tab filters at login
 }
@@ -147,6 +148,20 @@ function ns.InitDB()
   -- Stamina and armor. Kept above zero for dungeons/leveling, where it saves the healer's mana.
   if (db.weightsVersion or 1) < 5 and db.weights.bear.dodge == 1.7 then db.weights.bear.dodge = ns.DEFAULT_W.bear.dodge end
   if (db.weightsVersion or 1) < 5 then db.weightsVersion = 5 end
+  -- 1.18: caps follow who you fight. If you had typed your own caps, keep them ("custom").
+  if (db.weightsVersion or 1) < 6 then
+    if db.capHit ~= 8 or db.capSpellHit ~= 17 or db.capExp ~= 6.5 then db.capTarget = "custom" end
+    db.weightsVersion = 6
+  end
+  -- 1.18: Spell Piercing only matters against resistances (most mobs have none): 0.1, a tie-breaker
+  if (db.weightsVersion or 1) < 7 then
+    local old = { balance = 0.85, arcane = 0.6, fire = 0.6, frost = 0.6, affl = 0.6, demo = 0.5, destro = 0.7, shadow = 0.6, ele = 0.6 }
+    for mode, v in pairs(old) do
+      local w = db.weights[mode]
+      if w and w.spen == v and ns.DEFAULT_W[mode] then w.spen = ns.DEFAULT_W[mode].spen end
+    end
+    db.weightsVersion = 7
+  end
   ns.db = db
   return db
 end
@@ -563,20 +578,81 @@ function ns.AgiPctPerPoint()
 end
 
 local HIT_PER_PCT = 10
+
+-- WoW Forever hit and dodge chances by how many levels the target is above you (0, +1, +2, +3 = raid boss).
+-- Spells, dodge and the own-level / raid boss attack numbers: stated by the game (character sheet, live data
+-- build 1.60.1). Attacks against +1 / +2: Forever's game files list 5.2% and 5.4%.
+ns.CAP_TABLE = {
+  spell = { 4, 5, 6, 17 },     -- spell hit cap
+  melee = { 5, 5.2, 5.4, 8 },  -- melee and ranged hit cap
+  dodge = { 5, 5.5, 6, 6.5 },  -- target's dodge chance = expertise cap
+  dual  = { 24, 24.5, 25, 27 }, -- auto attacks while dual wielding (Rogue character sheet: 24% own level, 27% raid)
+}
+ns.CAP_TARGETS = {
+  { key = "auto",    text = "Automatic",      tip = "Your level until 60, then raid bosses." },
+  { key = "level",   text = "My level",       tip = "Questing: mobs your own level." },
+  { key = "dungeon", text = "Dungeon bosses", tip = "Bosses and trash 2 levels above you." },
+  { key = "raid",    text = "Raid bosses",    tip = "Bosses 3 levels above you (level 63 at 60)." },
+  { key = "custom",  text = "Custom",         tip = "Type your own numbers below." },
+}
+local CAP_DIFF = { level = 0, dungeon = 2, raid = 3 }
+function ns.CapTarget()
+  local t = ns.db.capTarget or "auto"
+  if t == "auto" then return ((ns.Level and ns.Level()) or 60) >= 60 and "raid" or "level" end
+  return t
+end
+-- the cap in use for capHit / capSpellHit / capExp: from the table, or what you typed when Custom
+function ns.CapValue(key)
+  local db = ns.db
+  local i = CAP_DIFF[ns.CapTarget()]
+  if i then
+    i = i + 1
+    if key == "capHit" then return ns.CAP_TABLE.melee[i] end
+    if key == "capSpellHit" then return ns.CAP_TABLE.spell[i] end
+    if key == "capExp" then return ns.CAP_TABLE.dodge[i] end
+    if key == "capDW" then return ns.CAP_TABLE.dual[i] end
+  end
+  if key == "capDW" then return (db.capHit or 0) > 0 and (db.capHit + 19) or 0 end -- Custom: dual wield adds 19%
+  return db[key] or 0
+end
+
+-- dual wielding: holding a weapon in the off hand (when previewing: the specs that usually do)
+local DW_SPECS = { fury = true, assn = true, combat = true, sub = true, sv = true }
+function ns.DualWielding(mode)
+  local R = ns.CLASS_RULES[ns.PlayerClass()]
+  if not (R and R.dual) or ns.Role(mode) ~= "melee" then return false end
+  if ns.Previewing() then return DW_SPECS[mode] or false end
+  local link = GetInventoryItemLink and GetInventoryItemLink("player", 17)
+  if not link or not GetInstant then return false end
+  local _, _, _, _, _, classID = GetInstant(link)
+  return classID == 2
+end
+-- past the special-attack hit cap, hit still stops auto-attack misses for dual wielders (up to 24-27%);
+-- auto attacks are roughly half of their damage, so that hit counts at half value
+local DW_WHITE = 0.5
+
+-- a cap of 0 in the settings means "no cap" (nil); otherwise what gear still needs, which can be 0
+-- (your talents already reach it: then more hit from gear is worth nothing)
+local function need(capPct, fromTalents, per)
+  if not capPct or capPct <= 0 then return nil end
+  return math.max(0, capPct - (fromTalents or 0)) * per
+end
 local function caps(mode)
   local db = ns.db
+  local tal = db.useTalents ~= false and ns.TalentMods or {}
+  -- hit you still need from gear: the cap, less hit from talents (read from the game) and any extra you entered
+  local talHit = (db.talHit or 0) + (tal.hit or 0)
   return {
-    -- hit you still need from gear: the cap, less hit from talents (read from the game) and any extra you entered
-    hit = math.max(0, (db.capHit or 0) - (db.talHit or 0) - ((db.useTalents ~= false and ns.TalentMods and ns.TalentMods.hit) or 0)) * HIT_PER_PCT,
-    exp = (db.capExp or 0) * 10, -- % -> points (10 per 1%, like hit)
-    shit = ns.IsCaster(mode) and math.max(0, (db.capSpellHit or 17) - ((db.useTalents ~= false and ns.TalentMods and ns.TalentMods.spellHit) or 0)) * HIT_PER_PCT or 0,
+    hit = need(ns.CapValue("capHit"), talHit, HIT_PER_PCT),
+    dw = ns.DualWielding(mode) and need(ns.CapValue("capDW"), talHit, HIT_PER_PCT) or nil,
+    exp = need(ns.CapValue("capExp"), 0, 10), -- % -> points (10 per 1%, like hit)
+    shit = ns.IsCaster(mode) and need(ns.CapValue("capSpellHit"), tal.spellHit, HIT_PER_PCT) or nil,
     -- (Defense from talents, e.g. Anticipation +20, is already yours: gear needs that much less)
-    def = ns.IsTank(mode) and math.max(0, (db.capDef or 0) - 100 * ((db.useTalents ~= false and not ns.Previewing()
-      and ns.TalentMods and ns.TalentMods[mode] and ns.TalentMods[mode].defskill) or 0)) or 0,
+    def = ns.IsTank(mode) and need(db.capDef, 100 * ((not ns.Previewing() and tal[mode] and tal[mode].defskill) or 0), 1) or nil,
   }
 end
 local function capped(cap, base, add)
-  if not cap or cap == 0 then return add end
+  if not cap then return add end
   return math.max(0, math.min(cap, base + add) - math.min(cap, base))
 end
 
@@ -603,7 +679,11 @@ function ns.Score(items, mode, base, scen)
   end
   local cp = caps(mode)
   for k, v in pairs(sum) do
-    if cp[k] and base then s = s + (w[k] or 0) * capped(cp[k], base[k] or 0, v)
+    if k == "hit" and cp.dw and cp.hit and base then
+      local b = base.hit or 0
+      local full = capped(cp.hit, b, v)
+      s = s + (w.hit or 0) * (full + DW_WHITE * math.max(0, capped(cp.dw, b, v) - full))
+    elseif cp[k] and base then s = s + (w[k] or 0) * capped(cp[k], base[k] or 0, v)
     else s = s + (w[k] or 0) * v end
   end
   return s
