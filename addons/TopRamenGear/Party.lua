@@ -109,7 +109,7 @@ end
 ---------------------------------------------------------------------------
 local function findRoll(itemID, rollID, test)
   for _, r in ipairs(rolls) do
-    if rollID and r.rollID == rollID and not r.test == not test then return r end
+    if rollID and r.rollID == rollID and r.itemID == itemID and not r.test == not test then return r end
   end
   for _, r in ipairs(rolls) do
     if r.itemID == itemID and not r.test == not test then return r end
@@ -133,11 +133,20 @@ end
 
 local refresh -- defined with the window
 
+local function itemInfo(x)
+  if C_Item and C_Item.GetItemInfo then return C_Item.GetItemInfo(x) end
+  if GetItemInfo then return GetItemInfo(x) end
+end
 local function scoreAndShare(r, tries)
-  if not r.link then return end
-  local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(r.link) or (GetItemInfo and GetItemInfo(r.link))
+  -- a roll someone else told us about may arrive before the game has the item: ask for it, then try again
+  if not r.link and r.itemID then r.link = select(2, itemInfo(r.itemID)) end
+  if not r.link then
+    if (tries or 0) < 10 and C_Timer then C_Timer.After(0.6, function() scoreAndShare(r, (tries or 0) + 1) end) end
+    return
+  end
+  local name = itemInfo(r.link)
   -- the item may not be loaded yet: try again shortly
-  if not name and (tries or 0) < 5 and C_Timer then
+  if not name and (tries or 0) < 10 and C_Timer then
     C_Timer.After(0.6, function() scoreAndShare(r, (tries or 0) + 1) end)
     return
   end
@@ -188,7 +197,8 @@ local function onMessage(prefix, msg, _, sender)
       if C_Item and C_Item.GetItemInfo then link = select(2, C_Item.GetItemInfo(itemID))
       elseif GetItemInfo then link = select(2, GetItemInfo(itemID)) end
       r = addRoll(itemID, link, rollID, 60)
-      if link then scoreAndShare(r) end
+      if rollID == 0 then r.label = "party test" end
+      scoreAndShare(r)
     end
     r.results[who] = { code = code, pct = tonumber(pct) or 0, spec = spec }
     if refresh then refresh() end
@@ -301,7 +311,7 @@ refresh = function()
     b.icon:SetItem(tex or "Interface\\Icons\\INV_Misc_QuestionMark", quality or 1)
     local qc = ns.UI.QualityColor(quality or 1)
     b.name:SetText(string.format("|cff%02x%02x%02x%s|r", math.floor(qc[1] * 255), math.floor(qc[2] * 255), math.floor(qc[3] * 255), name or (r.link or "Loading...")) ..
-      (r.test and (GREY .. "  (test)|r") or ""))
+      ((r.test or r.label) and (GREY .. "  (" .. (r.label or "test") .. ")|r") or ""))
 
     -- the people, best upgrade first
     local list = {}
@@ -389,6 +399,7 @@ end
 -- /trg rolltest [item link]: try the window with an item from your bags
 function ns.RollTest(arg)
   local link = arg and arg:match("|H(item:[^|]+)|h") and arg:match("(|c%x+|Hitem:.-|h.-|h|r)")
+  local party = arg and arg:lower():match("^%s*%S*%s*party") and channel() ~= nil
   if not link and C_Container then
     for bag = 0, 4 do
       for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
@@ -400,9 +411,18 @@ function ns.RollTest(arg)
   end
   if not link then print(GOLD .. "Top Ramen:|r no gear in your bags to test with. Try /trg rolltest [item link].") return end
   local itemID = tonumber(link:match("item:(%d+)"))
+  if party then
+    -- a pretend roll shared with the group (roll number 0): everyone with Gear scores it and answers,
+    -- so everyone sees the same window as on a real roll
+    local r = addRoll(itemID, link, 0, 40, false)
+    r.label = "party test"
+    scoreAndShare(r)
+    print(GOLD .. "Top Ramen:|r party test roll for " .. link .. " sent to your group.")
+    return
+  end
   local r = addRoll(itemID, link, nil, 30, true)
   scoreAndShare(r)
-  print(GOLD .. "Top Ramen:|r test roll for " .. link .. ". Drag the window where you want it; it remembers.")
+  print(GOLD .. "Top Ramen:|r test roll for " .. link .. ". Drag the window where you want it; it remembers. /trg rolltest party sends one to your group.")
 end
 
 ---------------------------------------------------------------------------

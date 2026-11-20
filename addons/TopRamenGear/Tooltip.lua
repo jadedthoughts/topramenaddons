@@ -232,6 +232,7 @@ function ns.Command(msg)
     say("/trg focus <-100 to 100> - Bear focus, survival (-) to threat (+) (now " .. (db.bearFocus or 0) .. ")")
     say("/trg party - who in your group has Gear (for the party loot window)")
     say("/trg rolltest - try the party loot window with an item from your bags")
+    say("/trg rolltest party [item link] - send a test roll your whole group sees")
     say("/trg hitcap <percent> - your own hit cap (now " .. ns.CapValue("capHit") .. "%; sets caps to Custom)")
     return true
   elseif cmd == "usetalents" then
