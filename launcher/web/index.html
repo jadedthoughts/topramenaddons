@@ -136,6 +136,7 @@ function render() {
   let n = '';
   if (flash) n += `<div class="notice ${flash.kind}">${flash.html}</div>`;
   if (s.manifestError) n += `<div class="notice err">${esc(s.manifestError)}</div>`;
+  else if (s.stale) n += `<div class="notice info">GitHub's free limit for update checks was reached, so this list may be a few minutes old. It sorts itself out within the hour.</div>`;
   if (s.launcherUpdate) n += s.canSelfUpdate
     ? `<div class="notice info lup"><span>A new launcher (version ${esc(s.launcherUpdate)}) is available.</span><button class="primary small" id="btnSelf">Update launcher</button></div>`
     : `<div class="notice info">A new launcher (version ${esc(s.launcherUpdate)}) is available. <a id="getLauncher">Download it</a>, then close this one and run the new file.</div>`;
@@ -217,11 +218,19 @@ async function selfUpdate() {
 async function load() { try { state = await api('state'); render(); } catch (e) {} }
 
 $('btnAll').onclick = () => install(state.addons.filter(a => a.status === 'update').map(a => a.folder));
-$('btnCheck').onclick = async () => {
-  busy = true; flash = null; render(); $('msg').innerHTML = '<span class="spin"></span>Checking…';
+let lastCheck = Date.now();
+async function check(quiet) {
+  if (busy) return;
+  lastCheck = Date.now();
+  busy = true; if (!quiet) flash = null; render(); $('msg').innerHTML = '<span class="spin"></span>Checking…';
   try { state = await api('check', {}); } catch (e) {}
   busy = false; render();
-};
+}
+$('btnCheck').onclick = () => check(false);
+// check again when you come back to the window, and every 10 minutes while it's open
+window.addEventListener('focus', () => { if (Date.now() - lastCheck > 30000) check(true); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastCheck > 30000) check(true); });
+setInterval(() => { if (Date.now() - lastCheck > 600000) check(true); }, 60000);
 $('chkTest').onchange = async () => {
   try { state = await api('settings', { showTest: $('chkTest').checked }); flash = null; render(); } catch (e) {}
 };

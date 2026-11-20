@@ -89,10 +89,12 @@ type State struct {
 	LauncherUpdate  string       `json:"launcherUpdate,omitempty"`
 	LauncherURL     string       `json:"launcherUrl,omitempty"`
 	CanSelfUpdate   bool         `json:"canSelfUpdate,omitempty"`
+	Stale           bool         `json:"stale,omitempty"`
 }
 
 type App struct {
 	quit      chan func() error // receives the finish step of a self-update
+	stale     bool              // the last list came from the cached backup address
 	mu        sync.Mutex
 	cfg       Config
 	cfgPath   string
@@ -220,15 +222,22 @@ func getManifest(url string, api bool) (*Manifest, error) {
 func (a *App) fetchManifest() {
 	var m *Manifest
 	var err error
+	stale := false
 	if ManifestAPI != "" {
-		if m, err = getManifest(ManifestAPI, true); err != nil {
+		// a unique address each time, so no cache along the way can answer with an old copy
+		if m, err = getManifest(fmt.Sprintf("%s&t=%d", ManifestAPI, time.Now().UnixNano()), true); err != nil {
 			log.Println("manifest via API:", err, "- trying raw")
 		}
 	}
 	if m == nil {
-		m, err = getManifest(fmt.Sprintf("%s?t=%d", ManifestURL, time.Now().Unix()), false)
+		m, err = getManifest(fmt.Sprintf("%s?t=%d", ManifestURL, time.Now().UnixNano()), false)
+		stale = err == nil && ManifestAPI != ""
+	}
+	if err == nil {
+		log.Printf("update list: %d addons, %d test, launcher %s (backup copy: %v)", len(m.Addons), len(m.TestAddons), m.Launcher.Version, stale)
 	}
 	a.mu.Lock()
+	a.stale = stale
 	defer a.mu.Unlock()
 	a.checkedAt = time.Now()
 	if err != nil {
@@ -249,6 +258,7 @@ func (a *App) state() State {
 	if a.mErr != nil {
 		s.ManifestError = friendlyNetErr(a.mErr)
 	}
+	s.Stale = a.stale
 	if a.manifest == nil {
 		s.Addons = []AddonState{}
 		return s
