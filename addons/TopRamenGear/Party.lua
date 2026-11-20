@@ -15,10 +15,12 @@ local rolls = {}         -- list of { itemID, link, rollID, ends, results = { [n
 local frame              -- the window
 local lastHello, replied = 0, {}
 
-local function myName() return (UnitName("player")) end
+local short
+local function myName() return short(UnitName("player")) end
 -- names without the realm: messages from players on another realm arrive as "Name-Realm",
 -- but the party list (UnitName) gives just "Name"
-local function short(name) if not name then return nil end return (name:match("^([^-]+)")) end
+-- (WoW Forever has also been seen sending "Name Something", so cut at a space too)
+short = function(name) if not name then return nil end return (name:match("^([^%-%s]+)")) end
 local function version()
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   return (get and get("TopRamenGear", "Version")) or "?"
@@ -71,7 +73,7 @@ local function roster()
   local raid = IsInRaid and IsInRaid()
   for i = 1, (raid and n or math.max(0, n - 1)) do
     local unit = raid and ("raid" .. i) or ("party" .. i)
-    local name = UnitName(unit)
+    local name = short(UnitName(unit))
     if name and name ~= myName() and name ~= UNKNOWNOBJECT then
       list[#list + 1] = { name = name, class = select(2, UnitClass(unit)), unit = unit }
     end
@@ -162,7 +164,7 @@ local function onMessage(prefix, msg, _, sender)
   if prefix ~= PREFIX or not msg then return end
   local who = short(sender)
   if not who then return end
-  diag.got = diag.got + 1; diag.lastFrom = sender .. ": " .. msg
+  diag.got = diag.got + 1; diag.lastFrom = (sender .. ": " .. msg):gsub("|", "||")
   local kind = msg:sub(1, 1)
   if kind == "H" or kind == "h" then
     known[who] = msg:match("^.|(.*)$") or "?"
