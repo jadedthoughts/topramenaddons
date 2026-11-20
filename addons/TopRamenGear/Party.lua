@@ -16,7 +16,9 @@ local frame              -- the window
 local lastHello, replied = 0, {}
 
 local function myName() return (UnitName("player")) end
-local function short(name) if not name then return nil end return (Ambiguate and Ambiguate(name, "none")) or name:match("^[^-]+") end
+-- names without the realm: messages from players on another realm arrive as "Name-Realm",
+-- but the party list (UnitName) gives just "Name"
+local function short(name) if not name then return nil end return (name:match("^([^-]+)")) end
 local function version()
   local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   return (get and get("TopRamenGear", "Version")) or "?"
@@ -33,11 +35,26 @@ local function channel()
   if IsInGroup and IsInGroup() then return "PARTY" end
 end
 
+local diag = { sent = 0, got = 0, lastFrom = nil, lastSend = nil }
+local function trySend(fn, msg, ch)
+  local ok, res = pcall(fn, PREFIX, msg, ch)
+  -- newer clients return a result: 0 (or true / nil on older ones) means it went out
+  local good = ok and (res == nil or res == true or res == 0)
+  diag.lastSend = ch .. (good and " ok" or (" failed (" .. tostring(res) .. ")"))
+  return good
+end
 local function send(msg)
   local ch = channel()
   if not ch then return end
   local fn = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-  if fn then pcall(fn, PREFIX, msg, ch) end
+  if not fn then return end
+  diag.sent = diag.sent + 1
+  if not trySend(fn, msg, ch) then
+    -- dungeon finder groups and normal parties use different channels: try the others
+    for _, other in ipairs({ "INSTANCE_CHAT", "PARTY", "RAID" }) do
+      if other ~= ch and trySend(fn, msg, other) then break end
+    end
+  end
 end
 
 local function hello(force)
@@ -145,6 +162,7 @@ local function onMessage(prefix, msg, _, sender)
   if prefix ~= PREFIX or not msg then return end
   local who = short(sender)
   if not who then return end
+  diag.got = diag.got + 1; diag.lastFrom = sender .. ": " .. msg
   local kind = msg:sub(1, 1)
   if kind == "H" or kind == "h" then
     known[who] = msg:match("^.|(.*)$") or "?"
@@ -348,6 +366,23 @@ refresh = function()
   if not frame:IsShown() then frame:Show() end
 end
 ns.RefreshRolls = function() if refresh then refresh() end end
+
+-- /trg party: what the party loot window knows (to sort out "Needs TR Gear Addon")
+function ns.PartyStatus()
+  local say = function(s) print(GOLD .. "Top Ramen:|r " .. s) end
+  local registered = C_ChatInfo and C_ChatInfo.IsAddonMessagePrefixRegistered and C_ChatInfo.IsAddonMessagePrefixRegistered(PREFIX)
+  say("party loot " .. (enabled() and "on" or "off") .. ", version " .. version() .. ", channel " .. tostring(channel() or "none (not in a group)")
+    .. ", listening " .. tostring(registered == nil and "?" or registered))
+  say("sent " .. diag.sent .. " (last: " .. tostring(diag.lastSend or "-") .. "), received " .. diag.got
+    .. (diag.lastFrom and (" (last: " .. diag.lastFrom .. ")") or ""))
+  for _, p in ipairs(roster()) do
+    if p.name ~= myName() then
+      say("  " .. p.name .. ": " .. (known[p.name] and ("has Gear " .. known[p.name]) or "no reply yet"))
+    end
+  end
+  hello(true)
+  say("(asked the group again - type /trg party in a few seconds to see who answered)")
+end
 
 -- /trg rolltest [item link]: try the window with an item from your bags
 function ns.RollTest(arg)

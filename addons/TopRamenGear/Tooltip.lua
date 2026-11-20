@@ -230,6 +230,7 @@ function ns.Command(msg)
     say("/trg bear, /trg cat, /trg balance, /trg resto - show or hide that line (now Bear " .. onOff(db.showBear) .. ", Cat " .. onOff(db.showCat) .. ", Balance " .. onOff(db.showBalance) .. ", Restoration " .. onOff(db.showResto) .. ")")
     say("/trg 3t - show or hide the Bear 3-target score (now " .. onOff(db.showBear3) .. ")")
     say("/trg focus <-100 to 100> - Bear focus, survival (-) to threat (+) (now " .. (db.bearFocus or 0) .. ")")
+    say("/trg party - who in your group has Gear (for the party loot window)")
     say("/trg rolltest - try the party loot window with an item from your bags")
     say("/trg hitcap <percent> - your own hit cap (now " .. ns.CapValue("capHit") .. "%; sets caps to Custom)")
     return true
@@ -286,6 +287,9 @@ function ns.Command(msg)
     if not n then say("Bear focus is " .. (db.bearFocus or 0) .. ". Use /trg focus -100 (all survival) to 100 (all threat).") return true end
     db.bearFocus = math.max(-100, math.min(100, math.floor(n / 10 + 0.5) * 10))
     say("Bear focus set to " .. db.bearFocus .. (db.bearFocus < 0 and " (survival)" or db.bearFocus > 0 and " (threat)" or " (balanced)"))
+    return true
+  elseif cmd == "party" then
+    if ns.PartyStatus then ns.PartyStatus() end
     return true
   elseif cmd == "rolltest" then
     if ns.RollTest then ns.RollTest(msg) end
