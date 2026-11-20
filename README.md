@@ -12,6 +12,8 @@ Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launche
 
 **Opening them:** every Top Ramen addon shares one bowl button on the minimap. Click it for a menu of the addons you have, right-click to reopen the last one, and drag it to move it. Each row has a **Macro** button that makes a macro for your action bar. You can also type `/tr` for the menu, `/tr button` to hide or show the minimap button, or set a hotkey under Esc → Key Bindings → AddOns.
 
+**AH upgrades (Top Ramen Gear):** the AH tab of `/trg` scans the whole auction house (the game allows it every 15 minutes) and lists the 5 biggest upgrades for each slot for your spec, with a star on the biggest upgrade and a coin on the best value per gold. Find puts an item in the auction house search so you can buy it there. Top Ramen Crafting and Gear share their scans.
+
 **Party loot (Top Ramen Gear):** when a loot roll starts in a group, a small window shows how big an upgrade the item is for everyone who has Top Ramen Gear, for the spec they've picked in their Gear window, with a star on the biggest upgrade. Party members without the addon show as "Needs TR Gear Addon". Drag the window anywhere and it remembers; `/trg rolltest` shows it with an item from your bags.
 
 **Test addons** are still being worked on. They only appear in the launcher when you tick **Show test addons** at the bottom of its window.

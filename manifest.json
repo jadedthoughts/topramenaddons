@@ -4,20 +4,20 @@
     {
       "folder": "TopRamenCrafting",
       "title": "Top Ramen Crafting",
-      "version": "2.4.1",
+      "version": "2.4.2",
       "notes": "/topramencraft (or /trc) opens the crafting planner: what to craft to level up, what makes money, and what to buy, with prices from its own auction house scan (Auctionator optional).",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenCrafting-2.4.1.zip",
-      "size": 109950,
-      "sha256": "b363419c779a90b097d23d8d815740f080feb1738b300b08646b8547aeec1012"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenCrafting-2.4.2.zip",
+      "size": 110561,
+      "sha256": "24d8df1048a851847d730af561955b3ab280a5cb9b740391f7608d32b440e06d"
     },
     {
       "folder": "TopRamenExplorer",
       "title": "Top Ramen Explorer",
-      "version": "1.2.2",
+      "version": "1.2.3",
       "notes": "/tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.2.2.zip",
-      "size": 89772,
-      "sha256": "1eddc4ffacdde87038089f877c71c87b08c004618203342635762192396bf10d"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.2.3.zip",
+      "size": 89939,
+      "sha256": "d12a15041101042613e162ec15109555a3cf30927ba7db965dad0815ca3af146"
     },
     {
       "folder": "TopRamenFarm",
@@ -31,22 +31,22 @@
     {
       "folder": "TopRamenGear",
       "title": "Top Ramen Gear",
-      "version": "1.19.4",
+      "version": "1.20.0",
       "notes": "/trg opens your class gear window, separated by spec. See what gear in your bags is the best while also getting an easy-to-use hunt list for items in any future dungeons. Not sure how much of an upgrade a dungeon drop is? Now you can compare the level of upgrade to anyone else who has the addon!",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.19.4.zip",
-      "size": 124442,
-      "sha256": "4da94df685af3f88e80fbda53656dfece9e3860dad117933c4dd6373f504661e"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.20.0.zip",
+      "size": 130406,
+      "sha256": "c246989221c3060126f64af4f135861bd056ab1cd0ac172a5f73dd62c64385bb"
     }
   ],
   "testAddons": [
     {
       "folder": "TopRamenMap",
       "title": "Top Ramen Map",
-      "version": "0.6.2",
+      "version": "0.6.3",
       "notes": "/trmap opens a big live minimap and a whole-dungeon overview with boss pins and routes. /trmap help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.6.2.zip",
-      "size": 78544,
-      "sha256": "6ad4c2c65b54165f4eb3d8f35acf831eda8facb0276d9d89c8f190dcea21dfe8"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.6.3.zip",
+      "size": 78711,
+      "sha256": "c20d1da0d6e3d35e9b35b1019d19f297bc1a0ab4d3cf63388f2fc025054a40e4"
     }
   ],
   "launcher": {

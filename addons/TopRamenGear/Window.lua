@@ -558,7 +558,7 @@ local pending = false
 ns.RefreshWindow = function()
   if not win or not win:IsShown() or pending then return end
   pending = true
-  C_Timer.After(0.3, function() pending = false; render(); if ns.RenderDungeons then ns.RenderDungeons() end end)
+  C_Timer.After(0.3, function() pending = false; render(); if ns.RenderDungeons then ns.RenderDungeons() end; if ns.RenderAH then ns.RenderAH() end end)
 end
 
 local function buildHeader(f, showTab)
@@ -575,15 +575,26 @@ local function buildHeader(f, showTab)
   local title = UI.Text(head, "GameFontNormalLarge", C.gold)
   title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 6, -3)
   title:SetText("Top Ramen")
-  f.who = UI.Text(head, "GameFontHighlightSmall", C.muted)
-  f.who:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+  -- "Gear v1.20.0", the same way as the other Top Ramen windows, then who you are
+  local sub = UI.Text(head, "GameFontHighlightSmall", C.muted)
+  sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+  sub:SetText("Gear")
+  local ver = UI.Text(head, "GameFontHighlightSmall", C.muted)
+  ver:SetPoint("LEFT", sub, "RIGHT", 6, 0)
+  ver:SetAlpha(0.6)
+  local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+  local v = get and get("TopRamenGear", "Version")
+  ver:SetText(v and ("v" .. v) or "")
+  f.who = UI.Text(head, "GameFontHighlightSmall", C.muted, 10)
+  f.who:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -2)
+  f.who:SetAlpha(0.8)
   -- close
   local close = CreateFrame("Button", nil, head, "UIPanelCloseButton")
   close:SetPoint("RIGHT", -8, 0)
   close:SetScript("OnClick", function() f:Hide() end)
   -- tabs
   local tabs, x = {}, -48
-  for _, t in ipairs({ { "settings", "Settings", 84 }, { "dungeons", "Dungeons", 88 }, { "gear", "Gear", 64 } }) do
+  for _, t in ipairs({ { "settings", "Settings", 84 }, { "ah", "AH", 52 }, { "dungeons", "Dungeons", 88 }, { "gear", "Gear", 64 } }) do
     local b = UI.Pill(head, t[3], 30, t[2], nil, function() showTab(t[1]) end)
     b:SetPoint("RIGHT", x, 0)
     x = x - t[3] - 4
@@ -625,15 +636,17 @@ local function build()
   local gp = CreateFrame("Frame", nil, f); gp:SetAllPoints(); f.gearPage = gp
   local sp = CreateFrame("Frame", nil, f); sp:SetAllPoints(); sp:Hide(); f.settingsPage = sp
   local dp = CreateFrame("Frame", nil, f); dp:SetAllPoints(); dp:Hide(); f.dungeonPage = dp
+  local ap = CreateFrame("Frame", nil, f); ap:SetAllPoints(); ap:Hide(); f.ahPage = ap
 
   local tabs
   local function showTab(name)
     ns.db.windowTab = name
-    gp:SetShown(name == "gear"); sp:SetShown(name == "settings"); dp:SetShown(name == "dungeons")
+    gp:SetShown(name == "gear"); sp:SetShown(name == "settings"); dp:SetShown(name == "dungeons"); ap:SetShown(name == "ah")
     f.specs:SetShown(name ~= "settings")
     for k, b in pairs(tabs) do b:SetActive(k == name, C.gold) end
     if name == "gear" then render()
     elseif name == "dungeons" then ns.RenderDungeons()
+    elseif name == "ah" then ns.RenderAH()
     else ns.RefreshSettings(); f.footer:SetText("Every setting is saved between sessions · /trg help lists the slash commands") end
   end
   f.showTab = showTab
@@ -643,12 +656,13 @@ local function build()
   -- the spec switcher, shared by the Gear and Dungeons tabs
   f.specs = UI.SpecSwitcher(f, function(m)
     ns.db.windowMode = m
-    render(); if ns.RenderDungeons then ns.RenderDungeons() end
+    render(); if ns.RenderDungeons then ns.RenderDungeons() end; if ns.RenderAH then ns.RenderAH() end
   end)
   f.specs:SetPoint("TOPLEFT", 16, -(HEAD_H + 12))
 
   ns.BuildSettings(sp)
   f.dungeonLayout = ns.BuildDungeons(dp, W, makeCell, f.specs)
+  f.ahLayout = ns.BuildAH(ap, f.specs)
 
   -- summary at the top right of the Gear tab
   gp.sumValue = UI.Text(gp, "GameFontNormalLarge")
@@ -704,7 +718,7 @@ local function build()
     local function at(h, x) h:ClearAllPoints(); h:SetPoint("TOPLEFT", 16 + x, -TOP) end
     at(heads.slot, 10); at(heads.cur, 86); at(heads.best, 86 + cw); at(heads.gain, 86 + 2 * cw)
   end
-  f.layouts = { layoutGear, f.dungeonLayout, ns.SettingsLayout }
+  f.layouts = { layoutGear, f.dungeonLayout, ns.SettingsLayout, f.ahLayout }
 
   -- resizing: drag the grip in the bottom-right corner
   f:SetResizable(true)
@@ -752,6 +766,7 @@ function ns.OpenTab(name)
   if win:IsShown() then win.showTab(name) else win:Show() end
 end
 function ns.OpenSettings() ns.OpenTab("settings") end
+function ns.SetFooter(text) if win and win.footer then win.footer:SetText(text) end end
 
 function ns.ToggleWindow()
   if not win then build() end

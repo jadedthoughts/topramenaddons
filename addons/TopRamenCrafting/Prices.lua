@@ -23,6 +23,10 @@ local events = CreateFrame("Frame")
 local function say(msg) if ns.say then ns.say(msg) else print("Top Ramen: " .. msg) end end
 local function refresh() if ns.RefreshWindow then ns.RefreshWindow() end end
 local function after(sec, fn) if C_Timer then C_Timer.After(sec, fn) else fn() end end
+-- shared by the Top Ramen addons (Gear also does full scans): when any of them last asked for one,
+-- so neither asks again inside the game's 15 minutes, and each reads the other's results
+local shared = _G.TopRamenAH or {}
+_G.TopRamenAH = shared
 
 local function db()
   local d = ns.db and ns.db() or {}
@@ -132,8 +136,8 @@ end
 
 -- seconds until the game allows another full scan (0 = now)
 function Prices.fullScanWait()
-  local last = realm().lastFullAttempt
-  if not last then return 0 end
+  local last = math.max(realm().lastFullAttempt or 0, shared.tried or 0)
+  if last == 0 then return 0 end
   return math.max(0, FULL_SCAN_COOLDOWN - (time() - last))
 end
 
@@ -164,7 +168,7 @@ end
 ---------------------------------------------------------------------------
 local function finishScan(msg)
   scan = nil
-  events:UnregisterEvent("REPLICATE_ITEM_LIST_UPDATE")
+  if not ahOpen then events:UnregisterEvent("REPLICATE_ITEM_LIST_UPDATE") end
   events:UnregisterEvent("COMMODITY_SEARCH_RESULTS_UPDATED")
   events:UnregisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
   if msg then say(msg) end
@@ -210,7 +214,8 @@ local function readReplicate()
       items = items + 1
     end
     realm().fullScanAt = t
-    finishScan(("full scan done: %d listings, prices for %d items%s."):format(total, items,
+    finishScan((scan and scan.passive and "prices updated from Top Ramen Gear's full scan: %d listings, %d items%s." or
+      "full scan done: %d listings, prices for %d items%s."):format(total, items,
       skipped > 0 and (" (" .. skipped .. " listings had no item ID yet and were skipped)") or ""))
   end
   step()
@@ -223,6 +228,13 @@ function Prices.fullScan()
   if scan then say("a scan is already running."); return end
   local wait = Prices.fullScanWait()
   if wait > 0 then
+    -- Top Ramen Gear scanned since our last full scan: its results are still here to read
+    if (shared.tried or 0) > (realm().fullScanAt or 0) and (A.GetNumReplicateItems() or 0) > 0 then
+      scan = { kind = "full", passive = true, started = time() }
+      say("using the full scan Top Ramen Gear made " .. ago(shared.tried) .. ".")
+      readReplicate()
+      return
+    end
     say("the game only allows a full scan every 15 minutes. Next one in " .. math.ceil(wait / 60) ..
       " min. Quick scan checks just your recipe materials right now.")
     return
@@ -230,6 +242,7 @@ function Prices.fullScan()
   scan = { kind = "full", started = time(), clock = GetTime and GetTime() or time() }
   local mine = scan
   realm().lastFullAttempt = time()
+  shared.tried = time()
   events:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
   say("full scan started. It can take up to a minute; keep the auction house open.")
   local ok, err = pcall(A.ReplicateItems)
@@ -338,17 +351,26 @@ end
 for _, e in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "MERCHANT_SHOW" }) do pcall(events.RegisterEvent, events, e) end
 events:SetScript("OnEvent", function(_, event, arg1)
   if event == "AUCTION_HOUSE_SHOW" then
-    ahOpen = true; refresh()
+    ahOpen = true
+    -- listen for full scans from either addon while the auction house is open
+    pcall(events.RegisterEvent, events, "REPLICATE_ITEM_LIST_UPDATE")
+    -- remember our own last scan for the other addons (after a /reload the shared note is empty)
+    shared.tried = math.max(shared.tried or 0, realm().lastFullAttempt or 0)
+    refresh()
   elseif event == "AUCTION_HOUSE_CLOSED" then
     ahOpen = false
+    if not scan then events:UnregisterEvent("REPLICATE_ITEM_LIST_UPDATE") end
     if scan then finishScan(scan.kind == "full" and "full scan stopped: the auction house closed." or "quick scan stopped: the auction house closed.") end
     refresh()
   elseif event == "MERCHANT_SHOW" then
     after(0.3, readMerchant)
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
     if scan and scan.kind == "full" and not scan.total then
-      events:UnregisterEvent("REPLICATE_ITEM_LIST_UPDATE")
       readReplicate()
+    elseif not scan and (shared.tried or 0) > (realm().fullScanAt or 0) and time() - (shared.tried or 0) < 600 then
+      -- Top Ramen Gear asked for a full scan: update our prices from it too (once it has all arrived)
+      scan = { kind = "full", passive = true, started = time() }
+      after(2, function() if scan and scan.passive and not scan.total then readReplicate() end end)
     end
   elseif event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
     local id = arg1

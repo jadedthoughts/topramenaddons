@@ -127,6 +127,13 @@ end
 
 -- the header: TR bowl, "Top Ramen", a subtitle, close button. Returns the header frame;
 -- put header buttons to the left of header.close.
+-- "v1.2.3" from the addon's .toc
+function UI.Version()
+  local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+  local v = get and get(addonName, "Version")
+  return v and v ~= "" and ("v" .. v) or ""
+end
+
 function UI.Header(f, subtitle)
   local head = UI.Frame(f, C.panel)
   head:SetPoint("TOPLEFT", 2, -2); head:SetPoint("TOPRIGHT", -2, -2); head:SetHeight(UI.HEAD_H)
@@ -142,6 +149,11 @@ function UI.Header(f, subtitle)
   head.sub = UI.Text(head, "GameFontHighlightSmall", C.muted)
   head.sub:SetPoint("TOPLEFT", head.title, "BOTTOMLEFT", 0, -3)
   head.sub:SetText(subtitle or "")
+  -- the addon's version, the same way in every Top Ramen window: dimmed, after the subtitle
+  head.ver = UI.Text(head, "GameFontHighlightSmall", C.muted)
+  head.ver:SetPoint("LEFT", head.sub, "RIGHT", 6, 0)
+  head.ver:SetAlpha(0.6)
+  head.ver:SetText(UI.Version())
   head.close = CreateFrame("Button", nil, head, "UIPanelCloseButton")
   head.close:SetPoint("RIGHT", -8, 0)
   head.close:SetScript("OnClick", function() f:Hide() end)
