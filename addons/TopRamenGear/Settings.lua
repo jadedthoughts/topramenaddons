@@ -131,7 +131,7 @@ function ns.BuildSettings(p)
   local changed = function() ns.ClearScores() end
   local sf
   sf, content = ns.MakeScroll(p, "TopRamenGearSettingsScroll", -(58 + 14))
-  content:SetHeight(330 + 12 + 124 + 12 + 150)
+  content:SetHeight(330 + 12 + 154 + 12 + 150)
 
   -- Specs in tooltips
   local c1 = card(content, "Specs in tooltips", 330)
@@ -146,6 +146,20 @@ function ns.BuildSettings(p)
   for _, sp in ipairs(ns.ClassSpecs()) do
     check(c1, sp.show, sp.group == "Feral" and ("Feral: " .. sp.name) or sp.name, 30, y, changed); y = y - 26
     if sp.key == "bear" then check(c1, "showBear3", "Bear, Swipe on 3 targets", 52, y, changed); y = y - 26 end
+    if sp.key == "sub" then
+      local dg = check(c1, "subDaggers", "Subtlety: prefer a dagger in the main hand", 52, y, changed); y = y - 22
+      note(c1, "Leave on if you use Backstab or Ambush. Turn off for a sword, mace or fist build (Sinister Strike, Hemorrhage).", 80, y, 260)
+      y = y - 30
+      dg:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Subtlety: prefer a dagger", 1, 0.82, 0)
+        GameTooltip:AddLine("Backstab and Ambush need a dagger in your main hand, and Hemorrhage and Ghostly Strike hit about 45% harder with one. While this is on, a main-hand sword, mace or fist weapon counts 70% of its DPS for Subtlety.", 1, 1, 1, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Turn it off if your Subtlety build doesn't use a dagger. Combat and Assassination aren't affected.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+      end)
+      dg:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
   end
   local div = c1:CreateTexture(nil, "ARTWORK")
   div:SetColorTexture(UI.C.line[1], UI.C.line[2], UI.C.line[3], 1); div:SetHeight(1)
@@ -297,7 +311,7 @@ function ns.BuildSettings(p)
   end
 
   -- Dungeons tab defaults
-  local c3 = card(content, "Dungeons tab", 124)
+  local c3 = card(content, "Dungeons tab and party loot", 154)
   local within = check(c3, "dgWithinDefault", "Start with \"Usable within\" turned on, for", 14, -36)
   local lv = capRow(c3, "dgWithinLevels", "levels", -36)
   -- the number box follows the checkbox text, with "levels" after it
@@ -305,6 +319,11 @@ function ns.BuildSettings(p)
   lv.__label:ClearAllPoints(); lv.__label:SetPoint("LEFT", lv, "RIGHT", 6, 0)
   check(c3, "dgShowAllDefault", "Start with \"Show non-upgrades\" turned on", 14, -64)
   check(c3, "dgMineDefault", "Start with \"Only what I can get\" turned on (hides other faction / class rewards)", 14, -92)
+  local rc = check(c3, "rollCompare", "Party loot window: compare loot rolls with party members who have Top Ramen Gear", 14, -120,
+    function() if ns.RefreshRolls then ns.RefreshRolls() end end)
+  local rt = UI.Button(c3, 70, 22, "Test", function() if ns.RollTest then ns.RollTest() end end,
+    "Shows the party loot window with an item from your bags, so you can see it and drag it where you want it. Same as /trg rolltest.")
+  rt:SetPoint("LEFT", rc.__label, "RIGHT", 10, 0)
 
   -- Tools
   local c4 = card(content, "Tools", 150)

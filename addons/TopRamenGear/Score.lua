@@ -59,6 +59,8 @@ local DEFAULTS = {
   capTarget = "auto", -- hit and expertise caps for: auto (my level until 60, then raid), level, dungeon, raid, custom
   useTalents = true,   -- apply your talents to the scores
   dgWithinDefault = false, dgWithinLevels = 5, dgShowAllDefault = false, dgMineDefault = true, -- Dungeons tab filters at login
+  rollCompare = true,  -- party loot roll window
+  subDaggers = true,   -- Subtlety: a main hand that isn't a dagger counts its weapon DPS at 70%
 }
 
 -- the specs Top Ramen scores, by class (only Druids for now; Feral covers Bear and Cat)
@@ -334,7 +336,7 @@ function ns.ItemStats(link)
   if slot == "ranged" and st.wdps then st.rwdps = st.wdps; st.wdps = nil end
   local id = tonumber(link:match("item:(%d+)"))
   local it = { id = id, link = link, name = name, q = quality, rl = reqLevel or 0, s = slot, st = st, fx = (#fx > 0) and fx or nil,
-               loc = equipLoc }
+               loc = equipLoc, cls = classID, sub = subclassID }
   -- weapons and anything with an effect line get read again shortly, in case part of the text was still loading;
   -- after that the result is kept
   if pending then return it end
@@ -630,6 +632,7 @@ end
 -- past the special-attack hit cap, hit still stops auto-attack misses for dual wielders (up to 24-27%);
 -- auto attacks are roughly half of their damage, so that hit counts at half value
 local DW_WHITE = 0.5
+local SUB_NON_DAGGER = 0.7
 
 -- a cap of 0 in the settings means "no cap" (nil); otherwise what gear still needs, which can be 0
 -- (your talents already reach it: then more hit from gear is worth nothing)
@@ -660,9 +663,15 @@ end
 -- scen: 1 = single target, 3 = Swipe on 3 targets (Bear)
 function ns.Score(items, mode, base, scen)
   local w, sum, s = ns.Weights(mode), {}, 0
+  -- Subtlety: Backstab and Ambush need a dagger in the main hand, and Hemorrhage / Ghostly Strike hit about 45%
+  -- harder with one, so another main-hand weapon's DPS counts at 70% (Settings can turn this off)
+  local daggerRule = mode == "sub" and ns.db.subDaggers ~= false
   for _, it in ipairs(items) do
     if it then
-      for k, v in pairs(it.st) do sum[k] = (sum[k] or 0) + v end
+      for k, v in pairs(it.st) do
+        if k == "wdps" and daggerRule and it.cls == 2 and it.sub ~= 15 then v = v * SUB_NON_DAGGER end
+        sum[k] = (sum[k] or 0) + v
+      end
       -- healing: an item's "+healing" line, or else its "+damage and healing" (spell power) heals too
       if ns.IsHealer(mode) and not it.st.heal and it.st.sp then sum.heal = (sum.heal or 0) + it.st.sp end
       local ex = ns.EffectStats(it, mode, scen or 1)

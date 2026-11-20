@@ -121,6 +121,12 @@ local function gain(it, mode, scen)
   return new - old, p.note
 end
 ns.Gain = gain
+-- the score of what the item would replace (0 for an empty slot), for the party roll window's percentages
+function ns.RollOldScore(it, mode)
+  local p = plan(it, mode)
+  if not p then return 0 end
+  return ns.Score(p.old, mode, p.base, 1)
+end
 
 local function fmt(d)
   if not d then return GREY .. "–|r" end
@@ -224,6 +230,7 @@ function ns.Command(msg)
     say("/trg bear, /trg cat, /trg balance, /trg resto - show or hide that line (now Bear " .. onOff(db.showBear) .. ", Cat " .. onOff(db.showCat) .. ", Balance " .. onOff(db.showBalance) .. ", Restoration " .. onOff(db.showResto) .. ")")
     say("/trg 3t - show or hide the Bear 3-target score (now " .. onOff(db.showBear3) .. ")")
     say("/trg focus <-100 to 100> - Bear focus, survival (-) to threat (+) (now " .. (db.bearFocus or 0) .. ")")
+    say("/trg rolltest - try the party loot window with an item from your bags")
     say("/trg hitcap <percent> - your own hit cap (now " .. ns.CapValue("capHit") .. "%; sets caps to Custom)")
     return true
   elseif cmd == "usetalents" then
@@ -279,6 +286,9 @@ function ns.Command(msg)
     if not n then say("Bear focus is " .. (db.bearFocus or 0) .. ". Use /trg focus -100 (all survival) to 100 (all threat).") return true end
     db.bearFocus = math.max(-100, math.min(100, math.floor(n / 10 + 0.5) * 10))
     say("Bear focus set to " .. db.bearFocus .. (db.bearFocus < 0 and " (survival)" or db.bearFocus > 0 and " (threat)" or " (balanced)"))
+    return true
+  elseif cmd == "rolltest" then
+    if ns.RollTest then ns.RollTest(msg) end
     return true
   elseif cmd == "hitcap" then
     local n = tonumber(arg)

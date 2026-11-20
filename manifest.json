@@ -31,11 +31,11 @@
     {
       "folder": "TopRamenGear",
       "title": "Top Ramen Gear",
-      "version": "1.18.0",
+      "version": "1.19.0",
       "notes": "/trg opens your class gear window, separated by spec. See what gear in your bags is the best while also getting an easy-to-use hunt list for items in any future dungeons. Not sure how much of an upgrade a dungeon drop is? Now you can compare the level of upgrade to anyone else who has the addon!",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.18.0.zip",
-      "size": 116828,
-      "sha256": "7c525ede7ac5eec685358996c699907fd4acc835c6594b05c24c92fcb92dbc98"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.19.0.zip",
+      "size": 123039,
+      "sha256": "359707fbe37134a3a7061e9c3d1c2a02899bbb811b24266042c1e06936c060c6"
     }
   ],
   "testAddons": [
