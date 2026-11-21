@@ -48,9 +48,11 @@ local function data()
   ns.db.ah = ns.db.ah or {}
   return ns.db.ah
 end
+local ahIsOpen = false -- set by AUCTION_HOUSE_SHOW / CLOSED
 local function ahOpen()
-  return (AuctionHouseFrame and AuctionHouseFrame:IsShown()) or (AuctionFrame and AuctionFrame:IsShown()) or false
+  return ahIsOpen or (AuctionHouseFrame and AuctionHouseFrame:IsShown()) or (AuctionFrame and AuctionFrame:IsShown()) or false
 end
+ns.AHOpen = ahOpen
 -- the level range you typed ("Only items within levels X and Y"): nil for an empty box.
 -- Starts at your level - 5 and your level; both boxes empty or the box unticked = no level filter.
 -- a scan saved by an earlier version used full item links: shrink it to short codes once
@@ -604,6 +606,9 @@ ev:SetScript("OnEvent", function(_, event)
   else
     -- remember our own last scan for Crafting (after a /reload the shared note is empty)
     if event == "AUCTION_HOUSE_SHOW" and ns.db then shared.tried = math.max(shared.tried or 0, data().tried or 0) end
+    -- the AH tab only works while the auction house is open (it's no use anywhere else, and costs nothing when not shown)
+    if event == "AUCTION_HOUSE_SHOW" then ahIsOpen = true elseif event == "AUCTION_HOUSE_CLOSED" then ahIsOpen = false end
+    if ns.SetAHTab then ns.SetAHTab(ahIsOpen) end
     if ns.RenderAH then ns.RenderAH() end
   end
 end)

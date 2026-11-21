@@ -22,20 +22,20 @@
     {
       "folder": "TopRamenFarm",
       "title": "Top Ramen Farm",
-      "version": "0.2.1",
-      "notes": "/trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done. At a merchant, the Vendor items button sells the items you ticked.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenFarm-0.2.1.zip",
-      "size": 74499,
-      "sha256": "81f30ba4be5dbe5b8374e2510d30f4df7032b0b3bdb4a8dcd9720b2628b8bf4b"
+      "version": "0.3.0",
+      "notes": "/trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done. At a merchant, the Vendor items button sells the items you ticked. The Goal tab shows how long until your mount, dual spec or epic mount.",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenFarm-0.3.0.zip",
+      "size": 81442,
+      "sha256": "2b1eeaf0b3796645f65a0c8908e868469c9ef417220d9bcf56b39bc1f03120f7"
     },
     {
       "folder": "TopRamenGear",
       "title": "Top Ramen Gear",
-      "version": "1.20.1",
+      "version": "1.20.2",
       "notes": "/trg opens your class gear window, separated by spec. See what gear in your bags is the best while also getting an easy-to-use hunt list for items in any future dungeons. Not sure how much of an upgrade a dungeon drop is? Now you can compare the level of upgrade to anyone else who has the addon!",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.20.1.zip",
-      "size": 133889,
-      "sha256": "5f0480970e7e7b009f25deb7b994890a626bc115ecb118c37d344db0b4723d8c"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.20.2.zip",
+      "size": 134349,
+      "sha256": "7c30984cda46b787aa70738cf43a896838d805e1a24d3d162a5c6e1ded041c7c"
     }
   ],
   "testAddons": [

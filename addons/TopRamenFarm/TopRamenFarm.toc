@@ -1,8 +1,8 @@
 ## Interface: 16001
 ## Title: Top Ramen Farm
-## Notes: /trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done. At a merchant, the Vendor items button sells the items you ticked.
+## Notes: /trfarm opens the farm tracker. Press Start farming, loot things, and it tallies what you've made: vendor value vs. selling smart on the auction house. Toggle it off when you're done. At a merchant, the Vendor items button sells the items you ticked. The Goal tab shows how long until your mount, dual spec or epic mount.
 ## Author: Top Ramen
-## Version: 0.2.1
+## Version: 0.3.0
 ## IconTexture: Interface\AddOns\TopRamenFarm\Media\trIcon
 ## SavedVariables: TopRamenFarmDB, TopRamenLauncherDB
 ## OptionalDeps: TopRamenCrafting, Auctionator
@@ -17,6 +17,7 @@
 
 TRUI.lua
 TopRamenFarm.lua
+Goal.lua
 Window.lua
 Vendor.lua
 TRLauncher.lua

@@ -600,6 +600,22 @@ local function buildHeader(f, showTab)
     x = x - t[3] - 4
     tabs[t[1]] = b
   end
+  -- the AH tab is greyed out (and can't be clicked) unless the auction house is open
+  local ah = tabs.ah
+  function ah:SetUsable(on)
+    self.usable = on
+    if on then self:Enable() else self:Disable() end
+    self:SetAlpha(on and 1 or 0.35)
+  end
+  ah:HookScript("OnEnter", function(self)
+    if self.usable then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine("AH")
+    GameTooltip:AddLine("Talk to an auctioneer to use this tab.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  ah:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  ah:SetUsable(ns.AHOpen and ns.AHOpen() or false)
   return tabs
 end
 
@@ -640,6 +656,8 @@ local function build()
 
   local tabs
   local function showTab(name)
+    -- the AH tab only while the auction house is open
+    if name == "ah" and not (ns.AHOpen and ns.AHOpen()) then name = "gear" end
     ns.db.windowTab = name
     gp:SetShown(name == "gear"); sp:SetShown(name == "settings"); dp:SetShown(name == "dungeons"); ap:SetShown(name == "ah")
     f.specs:SetShown(name ~= "settings")
@@ -651,6 +669,7 @@ local function build()
   end
   f.showTab = showTab
   tabs = buildHeader(f, showTab)
+  f.tabs = tabs
   buildFooter(f)
 
   -- the spec switcher, shared by the Gear and Dungeons tabs
@@ -766,6 +785,15 @@ function ns.OpenTab(name)
   if win:IsShown() then win.showTab(name) else win:Show() end
 end
 function ns.OpenSettings() ns.OpenTab("settings") end
+
+-- the auction house opened or closed: grey out the AH tab or make it usable (leaving it if you were on it)
+function ns.SetAHTab(open)
+  if not win or not win.tabs then return end
+  win.tabs.ah:SetUsable(open and true or false)
+  if not open and ns.db.windowTab == "ah" then
+    if win:IsShown() then win.showTab("gear") else ns.db.windowTab = "gear" end
+  end
+end
 function ns.SetFooter(text) if win and win.footer then win.footer:SetText(text) end end
 
 function ns.ToggleWindow()

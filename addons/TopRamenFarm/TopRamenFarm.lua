@@ -7,7 +7,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "0.2.0"
+ns.VERSION = "0.3.0"
 ns.AH_CUT = 0.95        -- the auction house keeps 5% of a sale
 local HISTORY_MAX = 50  -- sessions kept per character
 
@@ -207,11 +207,42 @@ function ns.zonesText(s, max)
   return table.concat(first, ", ") .. " +" .. (#z - max)
 end
 
+-- per-zone tracking (for the Goal tab's zone list): time spent and loot picked up in each zone.
+-- s.zone / s.zoneSeg = the zone you're in and when you got there; s.zoneTime[zone] = seconds;
+-- s.zoneLoot[zone] = { money, items } shaped like a session, so ns.totals() can price it.
+local function curZone()
+  local z = GetRealZoneText and GetRealZoneText() or ""
+  return z ~= "" and z or nil
+end
+local function closeZone(s)
+  if s and s.zone and s.zoneSeg then
+    s.zoneTime = s.zoneTime or {}
+    s.zoneTime[s.zone] = (s.zoneTime[s.zone] or 0) + math.max(0, time() - s.zoneSeg)
+  end
+  if s then s.zoneSeg = nil end
+end
+local function openZone(s)
+  if not s or not s.running then return end
+  s.zone = curZone() or s.zone
+  s.zoneSeg = time()
+end
+local function zoneBucket(s)
+  if s.running and not s.zoneSeg then openZone(s) end -- a run started before zone tracking existed
+  local z = s.zone or curZone()
+  if not z then return nil end
+  s.zoneLoot = s.zoneLoot or {}
+  local b = s.zoneLoot[z]
+  if not b then b = { money = 0, items = {} }; s.zoneLoot[z] = b end
+  return b
+end
+
 function ns.start()
   local c = ns.char()
   if c.session and c.session.running then return end
-  c.session = { running = true, startedAt = time(), segStart = time(), elapsed = 0, money = 0, items = {}, order = {}, zoneOrder = {} }
+  c.session = { running = true, startedAt = time(), segStart = time(), elapsed = 0, money = 0, items = {}, order = {}, zoneOrder = {},
+    zoneTime = {}, zoneLoot = {} }
   noteZone(c.session)
+  openZone(c.session)
   ns.say("recording your loot. Type /trfarm stop (or press Stop farming) when you're done.")
   refresh(true)
 end
@@ -221,10 +252,18 @@ function ns.stop()
   local s = c.session
   if not s or not s.running then return end
   s.elapsed = ns.elapsed(s)
-  s.segStart, s.running, s.endedAt = nil, false, time()
+  closeZone(s)
+  s.segStart, s.running, s.endedAt, s.zone = nil, false, time(), nil
   local t = ns.totals(s)
-  -- what it was worth at the prices of the day you farmed it
+  -- what it was worth at the prices of the day you farmed it (the whole run, and each zone)
   s.snap = { money = t.money, vendor = t.vendor, smart = t.smart, count = t.count }
+  if s.zoneLoot then
+    s.zoneSnap = {}
+    for z, b in pairs(s.zoneLoot) do
+      local zt = ns.totals(b)
+      s.zoneSnap[z] = { money = zt.money, vendor = zt.vendor, smart = zt.smart }
+    end
+  end
   c.session = nil
   if t.count > 0 or t.money > 0 then
     table.insert(c.history, 1, s)
@@ -309,6 +348,12 @@ function ns.addItem(id, n, link)
   it.n = it.n + (n or 1)
   it.link = it.link or link
   it.last = time()
+  local b = zoneBucket(s)
+  if b then
+    local zi = b.items[id]
+    if not zi then zi = { n = 0 }; b.items[id] = zi end
+    zi.n = zi.n + (n or 1)
+  end
   refresh(true)
 end
 
@@ -316,6 +361,8 @@ function ns.addMoney(c)
   local s = ns.session()
   if not s or not s.running or not c or c <= 0 then return end
   s.money = (s.money or 0) + c
+  local b = zoneBucket(s)
+  if b then b.money = (b.money or 0) + c end
   refresh(true)
 end
 
@@ -382,6 +429,9 @@ ev:RegisterEvent("CHAT_MSG_MONEY")
 ev:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 ev:RegisterEvent("BAG_UPDATE_DELAYED")
+ev:RegisterEvent("PLAYER_MONEY")
+ev:RegisterEvent("SKILL_LINES_CHANGED")
+ev:RegisterEvent("UPDATE_FACTION")
 
 local infoQueued = false
 ev:SetScript("OnEvent", function(_, event, a1)
@@ -393,6 +443,7 @@ ev:SetScript("OnEvent", function(_, event, a1)
     if s and s.running then
       -- time logged out doesn't count; carry on recording
       s.segStart = time()
+      openZone(s)
       ns.say("still recording your farm session (" .. ns.clock(ns.elapsed(s)) .. " so far). /trfarm to see it.")
     end
     refresh(true)
@@ -401,6 +452,7 @@ ev:SetScript("OnEvent", function(_, event, a1)
     if s and s.running then
       s.elapsed = ns.elapsed(s)
       s.segStart = nil
+      closeZone(s)
     end
   elseif event == "CHAT_MSG_LOOT" then
     if not ns.isRunning() then return end
@@ -410,7 +462,15 @@ ev:SetScript("OnEvent", function(_, event, a1)
     if not ns.isRunning() then return end
     ns.addMoney(ns.parseMoney(a1))
   elseif event == "ZONE_CHANGED_NEW_AREA" then
-    if ns.isRunning() then noteZone(ns.session()); refresh(false) end
+    if ns.isRunning() then
+      local s = ns.session()
+      noteZone(s)
+      closeZone(s)
+      openZone(s)
+      refresh(false)
+    end
+  elseif event == "PLAYER_MONEY" or event == "SKILL_LINES_CHANGED" or event == "UPDATE_FACTION" then
+    refresh(false) -- the Goal tab and the mini tracker's goal countdown
   elseif event == "BAG_UPDATE_DELAYED" then
     if ns.BagsChanged then ns.BagsChanged() end
   elseif event == "GET_ITEM_INFO_RECEIVED" then
@@ -445,9 +505,11 @@ SlashCmdList.TOPRAMENFARM = function(msg)
     refresh(false)
   elseif cmd == "opacity" then
     if ns.SetOpacity then ns.SetOpacity(msg:match("opacity%s+(%d+)")) end
+  elseif cmd == "goal" then
+    if ns.ShowTab then ns.ShowTab("goal") end
   elseif cmd == "vendor" then
     if ns.VendorPrompt then ns.VendorPrompt() end
   else
-    ns.say("/trfarm opens the window. /trfarm bags opens the My bags tab. /trfarm start, /trfarm stop, /trfarm toggle, /trfarm mini (mini tracker on/off), /trfarm opacity 30-100, /trfarm vendor (at a merchant: sell what you ticked on the My bags tab).")
+    ns.say("/trfarm opens the window. /trfarm bags opens the My bags tab. /trfarm goal opens the Goal tab (save up for a mount, dual spec or epic mount). /trfarm start, /trfarm stop, /trfarm toggle, /trfarm mini (mini tracker on/off), /trfarm opacity 30-100, /trfarm vendor (at a merchant: sell what you ticked on the My bags tab).")
   end
 end

@@ -9,10 +9,11 @@ local WIDTH, HEIGHT = 780, 580
 local MIN_W, MIN_H, MAX_W, MAX_H = 720, 440, 1600, 1100
 local ROW_H = 22
 local TOP_LIST = 200 -- where the list well starts, from the top of the window
+local GOAL_H = 94    -- the Goal tab's settings sit at the top of the well; its list starts this much lower
 
 local frame, mini
 local W = {}
-local tab = "loot"      -- "loot" | "bags" | "history"
+local tab = "loot"      -- "loot" | "bags" | "history" | "goal"
 local bagSnap = nil     -- what's in your bags, re-read on every refresh of the My bags tab
 local viewIndex = nil   -- a history session being looked at (nil = current, or the last one)
 local rows = {}
@@ -21,10 +22,15 @@ local rows = {}
 -- sorting: click a column header to sort by it, click it again to flip the order.
 -- Loot and My bags share one setting, History has its own; both are saved.
 ---------------------------------------------------------------------------
-local DEFAULT_SORT = { loot = { key = "best", desc = true }, history = { key = "date", desc = true } }
-local TEXT_KEYS = { name = true } -- these start A to Z; every other column starts biggest / newest first
+local DEFAULT_SORT = { loot = { key = "best", desc = true }, history = { key = "date", desc = true },
+  goal = { key = "rate", desc = true } }
+local TEXT_KEYS = { name = true } -- these start A to Z
+local ASC_KEYS = { eta = true }   -- these start smallest first; every other column starts biggest / newest first
 
-local function sortGroup() return tab == "history" and "history" or "loot" end
+local function sortGroup()
+  if tab == "history" or tab == "goal" then return tab end
+  return "loot"
+end
 
 local function sortState()
   local st = ns.settings()
@@ -39,7 +45,7 @@ end
 local function setSort(key)
   local s = sortState()
   if s.key == key then s.desc = not s.desc
-  else s.key, s.desc = key, not TEXT_KEYS[key] end
+  else s.key, s.desc = key, not (TEXT_KEYS[key] or ASC_KEYS[key]) end
   ns.Refresh(false)
 end
 
@@ -113,7 +119,25 @@ local HIST_COLS = {
   { key = "gold", w = 96, title = "Coin looted" },
   { key = "dur", w = 70, title = "Time" },
 }
+local GOAL_COLS = {
+  { key = "eta", w = 96, title = "To goal" },
+  { key = "rate", w = 108, title = "Per hour" },
+  { key = "value", w = 104, title = "Made" },
+  { key = "time", w = 80, title = "Time" },
+  { key = "runs", w = 52, title = "Runs" },
+}
 local MAX_CELLS = 6
+
+local function colsFor()
+  if tab == "history" then return HIST_COLS end
+  if tab == "goal" then
+    local smart = ns.goalKind() == "smart"
+    GOAL_COLS[2].title = smart and "Smart / hour" or "Vendor / hour"
+    GOAL_COLS[3].title = smart and "Sell smart" or "Vendor value"
+    return GOAL_COLS
+  end
+  return LOOT_COLS
+end
 
 local function layoutCells(owner, cells, left, cols, leftPad)
   local x = 6
@@ -170,6 +194,19 @@ local function rowTooltip(row)
     if s.zoneOrder and #s.zoneOrder > 0 then GameTooltip:AddLine(table.concat(s.zoneOrder, ", "), 1, 1, 1, true) end
     GameTooltip:AddLine("Click to see this session's loot.", 0.29, 0.87, 0.5)
     GameTooltip:AddLine("Shift + right-click to delete it.", 0.97, 0.44, 0.44)
+  elseif d.kind == "zone" then
+    local z = d.z
+    GameTooltip:AddLine(z.name)
+    GameTooltip:AddDoubleLine("Runs", tostring(z.runs), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Time farmed", ns.clock(z.sec), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Coin looted", ns.money(z.money), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Vendor value", ns.money(z.vendor), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Sell smart", ns.money(z.smart), 1, 1, 1, 1, 1, 1)
+    if d.rate then GameTooltip:AddDoubleLine("Per hour", ns.money(d.rate), 1, 1, 1, 1, 1, 1) end
+    if z.name:find(",") then
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Runs from before zone tracking that crossed zones are grouped together here. New runs split their time and loot by zone.", 0.72, 0.68, 0.61, true)
+    end
   end
   GameTooltip:Show()
 end
@@ -295,8 +332,34 @@ local function fillHistory()
   return list
 end
 
+local function goalSortValue(e, key)
+  if key == "name" then return e.name end
+  if key == "runs" then return e.z.runs
+  elseif key == "time" then return e.z.sec
+  elseif key == "value" then return e.value
+  elseif key == "eta" then return e.etaSec
+  end
+  return e.rate -- "rate"
+end
+
+-- one row per zone you've farmed, with how long the rest of your goal would take there
+local function fillGoal()
+  local kind = ns.goalKind()
+  local total = ns.goalTotal()
+  local need = math.max(0, total - ns.goalHave())
+  local list = {}
+  for _, z in ipairs(ns.goalZones()) do
+    local rate = ns.perHour(z[kind], z.sec)
+    list[#list + 1] = { kind = "zone", name = z.name, z = z, value = z[kind], rate = rate, need = need, total = total,
+      etaSec = (rate and rate > 0 and total > 0) and (need / rate * 3600) or nil }
+  end
+  local srt = sortState()
+  sortList(list, goalSortValue, srt.key, srt.desc, function(a, b) return a.name < b.name end)
+  return list
+end
+
 local function drawRows(list)
-  local cols = tab == "history" and HIST_COLS or LOOT_COLS
+  local cols = colsFor()
   local width = W.content:GetWidth()
   for i, d in ipairs(list) do
     local r = getRow(i)
@@ -311,7 +374,20 @@ local function drawRows(list)
     if showCheck then r.check.id = d.id; r.check:SetChecked(ns.isVendorPick(d.id) and true or false) end
     local pad = tab == "bags" and 24 or 0 -- room for the checkbox
     r.icon:SetPoint("LEFT", 4 + pad, 0)
-    if d.kind == "history" then
+    if d.kind == "zone" then
+      r.icon:Show()
+      r.icon:SetTexture("Interface\\Icons\\INV_Misc_Map_01")
+      layoutCells(r, r.cells, r.left, cols, 28)
+      local z = d.z
+      r.left:SetText(HX.text .. z.name .. "|r")
+      r.cells[5]:SetText(tostring(z.runs))
+      r.cells[4]:SetText(ns.clock(z.sec))
+      r.cells[3]:SetText(ns.money(d.value, false, true))
+      r.cells[2]:SetText(d.rate and ns.money(d.rate, false, true) or HX.dim .. "-|r")
+      if d.total <= 0 then r.cells[1]:SetText(HX.dim .. "-|r")
+      elseif d.need <= 0 then r.cells[1]:SetText(HX.green .. "done|r")
+      else r.cells[1]:SetText(d.rate and (HX.text .. ns.etaText(d.need, d.rate) .. "|r") or HX.dim .. "-|r") end
+    elseif d.kind == "history" then
       r.icon:Hide()
       layoutCells(r, r.cells, r.left, cols, 8)
       local s = d.session
@@ -381,7 +457,9 @@ local function updateStatus()
   W.toggle:SetText(running and "|cfff87171\226\150\160|r  Stop farming" or "|cff4ade80\226\150\182|r  Start farming")
   if running then W.toggle:LockHighlight() else W.toggle:UnlockHighlight() end
   local where = s and ns.zonesText(s, 3) or ""
-  if mode == "bags" then
+  if tab == "goal" then
+    W.status:SetText(HX.gold .. "Saving up|r   " .. HX.muted .. "tick what you're saving for. The zones below are your saved runs, with the farm time left at each.|r")
+  elseif mode == "bags" then
     W.status:SetText(HX.gold .. "What's in my bags|r   " .. HX.muted .. "everything sellable you're carrying right now" ..
       ((s.skipped or 0) > 0 and (" \194\183 " .. s.skipped .. " quest / no-value item" .. (s.skipped == 1 and "" or "s") .. " left out") or "") .. "|r")
   elseif mode == "current" then
@@ -398,6 +476,10 @@ end
 local function updateBoxes()
   local s, mode = shown()
   local t = ns.totals(s)
+  W.boxVendor.title:SetText("Vendor everything")
+  W.boxSmart.title:SetText("Sell smart")
+  W.boxDiff.title:SetText("AH over vendor")
+  W.goalBar:Hide()
   if mode == "bags" then
     W.boxMoney.title:SetText("Sellable items")
     setBox(W.boxMoney, HX.text .. t.count .. "|r", HX.muted .. t.kinds .. (t.kinds == 1 and " kind of item" or " kinds of items") .. "|r")
@@ -416,6 +498,29 @@ local function updateBoxes()
   elseif t.ahWins == 0 then sub = HX.muted .. "vendor is your best bet|r"
   else sub = HX.muted .. t.ahWins .. (t.ahWins == 1 and " item sells" or " items sell") .. " better on the AH|r" end
   setBox(W.boxDiff, diff > 0 and ns.money(diff, true) or ns.money(0), sub)
+  if tab == "goal" then
+    local g = ns.goal()
+    local total, parts = ns.goalTotal()
+    local have = ns.goalHave()
+    local need = math.max(0, total - have)
+    local pct = total > 0 and math.min(100, math.floor(have / total * 100)) or 0
+    local rate, from = ns.goalRate()
+    W.boxMoney.title:SetText("Goal")
+    setBox(W.boxMoney, total > 0 and ns.money(total, false, true) or (HX.dim .. "-|r"),
+      HX.muted .. (#parts > 0 and table.concat(parts, " + ") or "tick what you're saving for") .. "|r")
+    W.boxVendor.title:SetText("You have")
+    setBox(W.boxVendor, ns.money(have, false, true), HX.muted .. (g.count == "gold" and "gold on hand"
+      or g.count == "vendor" and "gold + bags, vendored" or "gold + bags, sold smart") .. "|r")
+    W.boxSmart.title:SetText("Still needed")
+    setBox(W.boxSmart, total <= 0 and (HX.dim .. "-|r") or need <= 0 and (HX.green .. "Goal reached!|r") or ns.money(need, false, true),
+      total > 0 and (HX.muted .. pct .. "% of the way there|r") or "")
+    W.goalBar:SetValue(pct)
+    W.goalBar:SetShown(total > 0)
+    W.boxDiff.title:SetText("Farm time left")
+    local eta = ns.etaText(need, rate)
+    setBox(W.boxDiff, total <= 0 and (HX.dim .. "-|r") or need <= 0 and (HX.green .. "none|r") or (eta and (HX.text .. eta .. "|r") or (HX.dim .. "?|r")),
+      rate and (HX.muted .. "at " .. ns.money(rate, false, true) .. HX.muted .. " per hour, " .. from .. "|r") or (HX.dim .. "farm a run to estimate|r"))
+  end
   if tab == "loot" then W.tabs.loot:SetText("Loot" .. (t.count > 0 and (" (" .. t.count .. ")") or "")) end
   W.tabs.history:SetText("History (" .. #ns.char().history .. ")")
   if tab ~= "loot" then
@@ -443,20 +548,75 @@ local function updateMini()
   local sec = ns.elapsed(s)
   mini.top:SetText(HX.green .. "\226\151\143|r " .. HX.text .. ns.clock(sec) .. "|r" .. HX.muted .. "  Top Ramen Farm|r")
   local hr = ns.perHour(t.smart, sec)
+  local goal = ""
+  local total = ns.goalTotal()
+  if total > 0 then
+    local need = total - ns.goalHave()
+    if need <= 0 then goal = HX.green .. "   Goal reached!|r"
+    else
+      local eta = ns.etaText(need, (ns.goalRate()))
+      if eta then goal = HX.muted .. "   Goal|r " .. HX.text .. eta .. "|r" end
+    end
+  end
   mini.bottom:SetText(HX.muted .. "Vendor|r " .. ns.money(t.vendor, false, true) .. HX.muted .. "   Smart|r " .. ns.money(t.smart, false, true) ..
-    (hr and (HX.muted .. "   /hr|r " .. ns.money(hr, false, true)) or ""))
+    (hr and (HX.muted .. "   /hr|r " .. ns.money(hr, false, true)) or "") .. goal)
   mini:SetWidth(math.max(220, mini.bottom:GetStringWidth() + 24))
   mini:Show()
 end
 
+local function updateGoalPanel()
+  local g = ns.goal()
+  for _, def in ipairs(ns.GOALS) do
+    local c = W.goalChecks[def.key]
+    local done = ns.goalDone(def.key)
+    c:SetChecked(g[def.key] and true or false)
+    c.text:SetText((done and HX.dim or HX.text) .. def.label .. "|r " ..
+      (done and (HX.green .. "have it|r") or ns.money(ns.goalCost(def), false, true)))
+  end
+  W.goalCustomCheck:SetChecked(g.useCustom and true or false)
+  if not W.goalCustom:HasFocus() then W.goalCustom:SetText((g.custom or 0) > 0 and tostring(g.custom) or "") end
+  local on, auto = ns.isHonored()
+  W.goalHonored:SetChecked(on and true or false)
+  local _, city = ns.detectHonored()
+  local why
+  if not auto then why = "set by you; right-click to go back to automatic"
+  elseif not city then why = "couldn't read your reputation; tick it yourself"
+  elseif on then why = "you're Honored with " .. city
+  else why = "not Honored with " .. city .. " yet" end
+  W.goalHonored.text:SetText(HX.text .. "Honored discount|r  " .. HX.muted .. "10% off the mount and epic mount  \194\183  " .. why .. "|r")
+  for key, b in pairs(W.goalCount) do if key == g.count then b:LockHighlight() else b:UnlockHighlight() end end
+end
+
+-- the list moves down on the Goal tab to make room for its settings
+local function placeList()
+  local top = TOP_LIST + (tab == "goal" and GOAL_H or 0)
+  if W.listTop == top then return end
+  W.listTop = top
+  W.header:ClearAllPoints()
+  W.header:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -(top + 2))
+  W.header:SetPoint("RIGHT", frame, "RIGHT", -40, 0)
+  W.hl:ClearAllPoints()
+  W.hl:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -(top + 24))
+  W.hl:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -18, -(top + 24))
+  W.scroll:ClearAllPoints()
+  W.scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -(top + 28))
+  W.scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -40, 50)
+  W.empty:ClearAllPoints()
+  W.empty:SetPoint("TOP", frame, "TOP", 0, -(top + 60))
+end
+
 function ns.Refresh(full)
+  if full ~= false and ns.goalBagsDirty then ns.goalBagsDirty() end
   updateMini()
   if not frame or not frame:IsShown() then return end
   if tab == "bags" and full ~= false then bagSnap = ns.scanBags() end
+  placeList()
+  W.goal:SetShown(tab == "goal")
+  if tab == "goal" then updateGoalPanel() end
   updateStatus()
   updateBoxes()
   for name, b in pairs(W.tabs) do if name == tab then b:LockHighlight() else b:UnlockHighlight() end end
-  local cols = tab == "history" and HIST_COLS or LOOT_COLS
+  local cols = colsFor()
   layoutCells(W.header, W.headerCells, W.headerLeft, cols, tab == "history" and 8 or (tab == "bags" and 52 or 28))
   -- column names: the one you're sorting by is gold with an arrow showing the direction
   local srt = sortState()
@@ -470,7 +630,8 @@ function ns.Refresh(full)
     btn.key, btn.title = col and col.key, col and col.title
     btn:SetShown(col ~= nil)
   end
-  local leftKey, leftTitle = tab == "history" and "date" or "name", tab == "history" and "Session" or "Item"
+  local leftKey = tab == "history" and "date" or "name"
+  local leftTitle = tab == "history" and "Session" or tab == "goal" and "Zone" or "Item"
   W.headerLeft:SetText(headText(leftTitle, leftKey))
   W.headerLeftBtn.key, W.headerLeftBtn.title = leftKey, leftTitle
   local s, mode = shown()
@@ -500,7 +661,7 @@ function ns.Refresh(full)
   W.prices:ClearAllPoints()
   W.prices:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -28, 19)
   W.prices:SetPoint("LEFT", frame, "BOTTOMLEFT", math.max(170, fx + 10), 0)
-  local list = tab == "history" and fillHistory() or fillLoot(s)
+  local list = tab == "history" and fillHistory() or tab == "goal" and fillGoal() or fillLoot(s)
   drawRows(list)
   -- the header box ticks / clears every item in the My bags list
   local ids, allTicked = {}, true
@@ -517,6 +678,7 @@ function ns.Refresh(full)
   W.checkAll:SetChecked(#ids > 0 and allTicked)
   if #list == 0 then
     W.empty:SetText(tab == "history" and (HX.muted .. "No saved sessions yet. Stop a farm run and it lands here.|r")
+      or tab == "goal" and (HX.muted .. "No saved runs yet. Farm a run and stop it: each zone you farmed shows up here\nwith its gold per hour and the farm time left to your goal.|r")
       or tab == "bags" and (HX.muted .. "Nothing in your bags that a vendor will buy.|r")
       or (HX.muted .. (ns.isRunning() and "Recording... loot something and it shows up here." or "Press Start farming, then loot mobs, chests, herbs, ore or fish.") .. "|r"))
     W.empty:Show()
@@ -564,8 +726,13 @@ local function statBox(title, help, bagsTitle, bagsHelp)
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
     local bags = tab == "bags"
-    GameTooltip:AddLine(bags and bagsTitle or title)
-    GameTooltip:AddLine(bags and bagsHelp or help, 1, 1, 1, true)
+    if tab == "goal" and self.goalTitle then
+      GameTooltip:AddLine(self.goalTitle)
+      GameTooltip:AddLine(self.goalHelp, 1, 1, 1, true)
+    else
+      GameTooltip:AddLine(bags and bagsTitle or title)
+      GameTooltip:AddLine(bags and bagsHelp or help, 1, 1, 1, true)
+    end
     GameTooltip:Show()
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -640,16 +807,31 @@ local function build()
     "Sell smart", "Each item sold wherever it pays more: the auction house (after its 5% cut) or a vendor. Soulbound items count at vendor price.")
   W.boxDiff = statBox("AH over vendor", "How much more you make by putting the auction-house items up instead of vendoring them. Deposits aren't counted.",
     "AH over vendor", "How much more you'd make by putting the auction-house items up instead of vendoring them. Deposits aren't counted.")
+  W.boxMoney.goalTitle, W.boxMoney.goalHelp = "Goal", "Everything you ticked below, minus anything you already have (riding skill, dual spec). Honored with your home city takes 10% off the mount and epic mount."
+  W.boxVendor.goalTitle, W.boxVendor.goalHelp = "You have", "The gold you're carrying, plus your bags if you count them (choose below). Bags count only items a vendor will buy; quest items are left out."
+  W.boxSmart.goalTitle, W.boxSmart.goalHelp = "Still needed", "The goal minus what you have."
+  W.boxDiff.goalTitle, W.boxDiff.goalHelp = "Farm time left", "Still needed, divided by your gold per hour: this run's once it's 10 minutes old, otherwise your average over saved runs. Assumes you don't spend gold along the way."
+  -- a thin progress bar along the bottom of the Still needed box
+  W.goalBar = CreateFrame("StatusBar", nil, W.boxSmart)
+  W.goalBar:SetPoint("BOTTOMLEFT", 1, 1); W.goalBar:SetPoint("BOTTOMRIGHT", -1, 1)
+  W.goalBar:SetHeight(3)
+  W.goalBar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+  W.goalBar:SetStatusBarColor(1, 0.82, 0, 0.9)
+  W.goalBar:SetMinMaxValues(0, 100)
+  W.goalBar:Hide()
   placeBoxes()
 
   W.tabs = {}
-  W.tabs.loot = UI.Button(frame, 130, 26, "Loot", function() tab = "loot"; ns.Refresh(true) end)
+  W.tabs.loot = UI.Button(frame, 110, 26, "Loot", function() tab = "loot"; ns.Refresh(true) end)
   W.tabs.loot:SetPoint("TOPLEFT", 12, -168)
-  W.tabs.bags = UI.Button(frame, 130, 26, "My bags", function() tab = "bags"; ns.Refresh(true) end)
+  W.tabs.bags = UI.Button(frame, 110, 26, "My bags", function() tab = "bags"; ns.Refresh(true) end)
   W.tabs.bags:SetPoint("LEFT", W.tabs.loot, "RIGHT", 6, 0)
   tip(W.tabs.bags, "What's in my bags", "Everything you're carrying right now, priced vendor vs. auction house. Updates as your bags change. Quest items and items no vendor will buy are left out.")
-  W.tabs.history = UI.Button(frame, 130, 26, "History", function() tab = "history"; ns.Refresh(true) end)
+  W.tabs.history = UI.Button(frame, 110, 26, "History", function() tab = "history"; ns.Refresh(true) end)
   W.tabs.history:SetPoint("LEFT", W.tabs.bags, "RIGHT", 6, 0)
+  W.tabs.goal = UI.Button(frame, 110, 26, "Goal", function() tab = "goal"; ns.Refresh(true) end)
+  W.tabs.goal:SetPoint("LEFT", W.tabs.history, "RIGHT", 6, 0)
+  tip(W.tabs.goal, "Saving up", "Pick what you're saving for (mount, dual spec, epic mount or your own amount) and see how much farming is left, zone by zone.")
 
   W.miniCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
   W.miniCheck:SetSize(24, 24)
@@ -711,6 +893,7 @@ local function build()
   local hl = frame:CreateTexture(nil, "ARTWORK")
   hl:SetColorTexture(1, 0.82, 0, 0.25); hl:SetHeight(1)
   hl:SetPoint("TOPLEFT", well, "TOPLEFT", 6, -24); hl:SetPoint("TOPRIGHT", well, "TOPRIGHT", -6, -24)
+  W.hl = hl
 
   local scroll = CreateFrame("ScrollFrame", "TopRamenFarmScroll", frame, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 20, -(TOP_LIST + 28))
@@ -723,6 +906,97 @@ local function build()
   W.empty = label(frame, "", "GameFontHighlight")
   W.empty:SetPoint("TOP", well, "TOP", 0, -60)
   W.empty:SetJustifyH("CENTER")
+
+  -- Goal tab settings, at the top of the well
+  local p = CreateFrame("Frame", nil, frame)
+  p:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -4)
+  p:SetPoint("RIGHT", well, "RIGHT", -8, 0)
+  p:SetHeight(GOAL_H - 6)
+  p:Hide()
+  W.goal = p
+  local sep = p:CreateTexture(nil, "ARTWORK")
+  sep:SetColorTexture(1, 0.82, 0, 0.15); sep:SetHeight(1)
+  sep:SetPoint("BOTTOMLEFT", 0, 0); sep:SetPoint("BOTTOMRIGHT", 0, 0)
+
+  local saving = label(p, HX.muted .. "Saving for|r", "GameFontHighlight")
+  saving:SetPoint("TOPLEFT", 4, -10)
+  W.goalChecks = {}
+  local prev = saving
+  local function goalCheck(key, title, text)
+    local c = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
+    c:SetSize(24, 24)
+    c:SetPoint("LEFT", prev, "RIGHT", prev == saving and 8 or 14, 0)
+    c.text = label(c, "", "GameFontHighlight")
+    c.text:SetPoint("LEFT", c, "RIGHT", 1, 0)
+    c:SetScript("OnClick", function(self) ns.goal()[key] = self:GetChecked() and true or false; ns.Refresh(false) end)
+    tip(c, title, text)
+    prev = c.text
+    return c
+  end
+  for _, def in ipairs(ns.GOALS) do
+    W.goalChecks[def.key] = goalCheck(def.key, def.label, function()
+      local full = ns.money(def.cost, false, true)
+      local off = def.rep and (" " .. ns.money(math.floor(def.cost * ns.REP_DISCOUNT), false, true) .. " when you're Honored.") or ""
+      return def.help .. " " .. full .. "." .. off .. " Already have it? It's left out of the total."
+    end)
+  end
+  W.goalCustomCheck = goalCheck("useCustom", "Your own goal", "Add any amount of gold you want to save up, on top of anything else ticked.")
+  W.goalCustomCheck.text:SetText(HX.text .. "Other|r")
+  local eb = CreateFrame("EditBox", nil, p, "InputBoxTemplate")
+  eb:SetSize(64, 20)
+  eb:SetAutoFocus(false)
+  eb:SetNumeric(true)
+  eb:SetMaxLetters(6)
+  eb:SetPoint("LEFT", W.goalCustomCheck.text, "RIGHT", 12, 0)
+  local function saveCustom(self)
+    local g = ns.goal()
+    local n = tonumber(self:GetText()) or 0
+    if n ~= (g.custom or 0) then
+      g.custom = n
+      g.useCustom = n > 0
+    end
+    ns.Refresh(false)
+  end
+  eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+  eb:SetScript("OnEditFocusLost", saveCustom)
+  eb:SetScript("OnEscapePressed", function(self)
+    local c = ns.goal().custom or 0
+    self:SetText(c > 0 and tostring(c) or "")
+    self:ClearFocus()
+  end)
+  W.goalCustom = eb
+  local gl = label(p, HX.gold .. "g|r", "GameFontHighlight")
+  gl:SetPoint("LEFT", eb, "RIGHT", 4, 0)
+
+  W.goalHonored = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
+  W.goalHonored:SetSize(24, 24)
+  W.goalHonored:SetPoint("TOPLEFT", 0, -32)
+  W.goalHonored:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  W.goalHonored.text = label(W.goalHonored, "", "GameFontHighlight")
+  W.goalHonored.text:SetPoint("LEFT", W.goalHonored, "RIGHT", 1, 0)
+  W.goalHonored:SetScript("OnClick", function(self, button)
+    if button == "RightButton" then ns.goal().honored = nil
+    else ns.goal().honored = self:GetChecked() and true or false end
+    ns.Refresh(false)
+  end)
+  tip(W.goalHonored, "Honored discount", "Honored with your home city takes 10% off the mount and epic mount. It's ticked for you when the addon sees you're Honored. Click to set it yourself; right-click to go back to automatic.")
+
+  local count = label(p, HX.muted .. "Count toward it|r", "GameFontHighlight")
+  count:SetPoint("TOPLEFT", 4, -68)
+  W.goalCount = {}
+  prev = count
+  for _, o in ipairs({
+    { "gold", "Gold on hand", 116, "Only the gold you're carrying counts. Farm time uses your vendor value per hour." },
+    { "vendor", "+ bags, vendored", 140, "Your gold plus your bags sold to a vendor. Farm time uses your vendor value per hour." },
+    { "smart", "+ bags, sold smart", 150, "Your gold plus your bags sold smart (auction house where it pays more). Farm time uses your sell-smart value per hour." },
+  }) do
+    local key = o[1]
+    local b = UI.Button(p, o[3], 22, o[2], function() ns.goal().count = key; ns.goalBagsDirty(); ns.Refresh(false) end)
+    b:SetPoint("LEFT", prev, "RIGHT", prev == count and 10 or 6, 0)
+    tip(b, o[2], o[4])
+    W.goalCount[key] = b
+    prev = b
+  end
 
   -- footer
   W.back = UI.Button(frame, 150, 24, "Back to current", function() viewIndex = nil; ns.Refresh(true) end)
@@ -788,7 +1062,8 @@ local function buildMini()
 end
 
 function ns.BagsChanged()
-  if frame and frame:IsShown() and tab == "bags" then ns.Refresh(true) end
+  if ns.goalBagsDirty then ns.goalBagsDirty() end
+  if frame and frame:IsShown() and (tab == "bags" or tab == "goal") then ns.Refresh(true) end
 end
 
 function ns.ShowTab(name)
