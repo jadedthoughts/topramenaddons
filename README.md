@@ -2,6 +2,8 @@
 
 Addons by Top Ramen for World of Warcraft: Forever, plus a small Windows launcher that installs them and keeps them up to date.
 
+Built by **Crayon Ponyfish**.
+
 | Addon | Command | What it does |
 |---|---|---|
 | Top Ramen Gear | `/trg` | Gear window for your class, by spec: best gear in your bags, a hunt list for upcoming dungeon drops, and upgrade comparisons with other addon users |
