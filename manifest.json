@@ -13,11 +13,11 @@
     {
       "folder": "TopRamenExplorer",
       "title": "Top Ramen Explorer",
-      "version": "1.2.3",
+      "version": "1.2.4",
       "notes": "/tre finds the spots you still need for the Adventure > Explorer achievements and guides you there. /tre help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.2.3.zip",
-      "size": 89939,
-      "sha256": "d12a15041101042613e162ec15109555a3cf30927ba7db965dad0815ca3af146"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenExplorer-1.2.4.zip",
+      "size": 89946,
+      "sha256": "5a8f4d143d69d4213fd52a3e093acbb669bf1b1c453d9b6869f2dd089466a48a"
     },
     {
       "folder": "TopRamenFarm",
