@@ -35,9 +35,9 @@ func exePath() (string, error) {
 }
 
 // downloadLauncher tries GitHub's API first (always current), then the raw URL.
-func downloadLauncher(apiURL, rawURL string) ([]byte, error) {
+func downloadLauncher(urls ...string) ([]byte, error) {
 	var lastErr error
-	for _, u := range []string{apiURL, rawURL} {
+	for _, u := range urls {
 		if u == "" {
 			continue
 		}
@@ -59,7 +59,7 @@ func downloadLauncher(apiURL, rawURL string) ([]byte, error) {
 // it after shutting down the web server, then exits.
 func (a *App) selfUpdate() (func() error, error) {
 	a.mu.Lock()
-	m := a.manifest
+	m, commit := a.manifest, a.commit
 	a.mu.Unlock()
 	if m == nil || m.Launcher.Version == "" || m.Launcher.SHA256 == "" {
 		return nil, errors.New("the update list doesn't have a launcher update yet; try Check for updates")
@@ -71,7 +71,12 @@ func (a *App) selfUpdate() (func() error, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := downloadLauncher(m.Launcher.ExeAPI, m.Launcher.Exe)
+	// the .exe at the same commit as the version list matches its checksum exactly
+	exeAtCommit := ""
+	if commit != "" && RawBase != "" {
+		exeAtCommit = RawBase + commit + "/releases/TopRamenLauncher.exe"
+	}
+	data, err := downloadLauncher(exeAtCommit, m.Launcher.ExeAPI, m.Launcher.Exe)
 	if err != nil {
 		return nil, err
 	}

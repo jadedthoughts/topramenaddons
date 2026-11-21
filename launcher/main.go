@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -33,6 +34,52 @@ var Version = "dev"
 // can serve a copy up to 5 minutes old after a change.
 var ManifestAPI = "https://api.github.com/repos/jadedthoughts/topramenaddons/contents/manifest.json?ref=main"
 var ManifestURL = "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/manifest.json"
+
+// First choice: ask GitHub's git endpoint (the one `git clone` uses) for the
+// newest commit, then fetch files at that exact commit. Those addresses never
+// change, so no cache can serve an old copy, and this endpoint isn't subject
+// to the API's 60-requests-an-hour limit.
+var RepoGit = "https://github.com/jadedthoughts/topramenaddons.git"
+var RawBase = "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/"
+
+// latestCommit returns the commit ID that main points to right now.
+func latestCommit() (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", RepoGit+"/info/refs?service=git-upload-pack", nil)
+	req.Header.Set("User-Agent", "git/2.43.0 (TopRamenLauncher/"+Version+")")
+	req.Header.Set("Cache-Control", "no-cache")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("git endpoint answered %s", resp.Status)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		i := strings.Index(line, " refs/heads/main")
+		if i >= 40 {
+			sha := line[i-40 : i]
+			if isHex(sha) {
+				return sha, nil
+			}
+		}
+	}
+	return "", errors.New("main branch not found")
+}
+
+func isHex(s string) bool {
+	for _, c := range s {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return len(s) > 0
+}
 
 const port = 47321 // fixed, so a second launch just reopens the window
 
@@ -95,6 +142,7 @@ type State struct {
 type App struct {
 	quit      chan func() error // receives the finish step of a self-update
 	stale     bool              // the last list came from the cached backup address
+	commit    string            // commit the last list was read at ("" if not known)
 	mu        sync.Mutex
 	cfg       Config
 	cfgPath   string
@@ -222,22 +270,39 @@ func getManifest(url string, api bool) (*Manifest, error) {
 func (a *App) fetchManifest() {
 	var m *Manifest
 	var err error
-	stale := false
-	if ManifestAPI != "" {
+	stale, source, commit := false, "", ""
+	if RepoGit != "" {
+		if commit, err = latestCommit(); err == nil {
+			if m, err = getManifest(RawBase+commit+"/manifest.json", false); err == nil {
+				source = "commit " + commit[:7]
+			}
+		}
+		if err != nil {
+			log.Println("manifest via commit:", err, "- trying API")
+			commit = ""
+		}
+	}
+	if m == nil && ManifestAPI != "" {
 		// a unique address each time, so no cache along the way can answer with an old copy
 		if m, err = getManifest(fmt.Sprintf("%s&t=%d", ManifestAPI, time.Now().UnixNano()), true); err != nil {
 			log.Println("manifest via API:", err, "- trying raw")
+		} else {
+			source = "API"
 		}
 	}
 	if m == nil {
 		m, err = getManifest(fmt.Sprintf("%s?t=%d", ManifestURL, time.Now().UnixNano()), false)
 		stale = err == nil && ManifestAPI != ""
+		source = "raw (may be a few minutes old)"
 	}
 	if err == nil {
-		log.Printf("update list: %d addons, %d test, launcher %s (backup copy: %v)", len(m.Addons), len(m.TestAddons), m.Launcher.Version, stale)
+		log.Printf("update list: %d addons, %d test, launcher %s, from %s", len(m.Addons), len(m.TestAddons), m.Launcher.Version, source)
 	}
 	a.mu.Lock()
 	a.stale = stale
+	if err == nil {
+		a.commit = commit
+	}
 	defer a.mu.Unlock()
 	a.checkedAt = time.Now()
 	if err != nil {
@@ -564,7 +629,7 @@ func main() {
 	}
 	log.Printf("Top Ramen Launcher %s starting", Version)
 	if v := os.Getenv("TOPRAMEN_MANIFEST_URL"); v != "" { // for testing
-		ManifestURL, ManifestAPI = v, ""
+		ManifestURL, ManifestAPI, RepoGit = v, "", ""
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
 
