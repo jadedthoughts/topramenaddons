@@ -223,7 +223,8 @@ async function check(quiet) {
   if (busy) return;
   lastCheck = Date.now();
   busy = true; if (!quiet) flash = null; render(); $('msg').innerHTML = '<span class="spin"></span>Checking…';
-  try { state = await api('check', {}); } catch (e) {}
+  try { state = await api('check', {}); }
+  catch (e) { flash = { kind:'err', html: "Lost touch with the launcher program. Close this window and open the launcher again." }; }
   busy = false; render();
 }
 $('btnCheck').onclick = () => check(false);
@@ -250,6 +251,8 @@ $('btnPathSave').onclick = async () => {
 load();
 // keep checking until the first update list arrives
 const firstLoad = setInterval(() => { if (state && (state.addons.length || state.manifestError)) clearInterval(firstLoad); else load(); }, 700);
+// tell the launcher when this window closes, so it can exit right away
+window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch (e) {} });
 // tell the launcher this window is still open
 setInterval(() => fetch('/api/ping').catch(() => {}), 2000);
 fetch('/api/ping');

@@ -141,6 +141,7 @@ type State struct {
 
 type App struct {
 	quit      chan func() error // receives the finish step of a self-update
+	byeAt     time.Time         // when the page said it was closing
 	stale     bool              // the last list came from the cached backup address
 	commit    string            // commit the last list was read at ("" if not known)
 	mu        sync.Mutex
@@ -293,7 +294,10 @@ func (a *App) fetchManifest() {
 	if m == nil {
 		m, err = getManifest(fmt.Sprintf("%s?t=%d", ManifestURL, time.Now().UnixNano()), false)
 		stale = err == nil && ManifestAPI != ""
-		source = "raw (may be a few minutes old)"
+		source = "raw"
+		if stale {
+			source = "raw (may be a few minutes old)"
+		}
 	}
 	if err == nil {
 		log.Printf("update list: %d addons, %d test, launcher %s, from %s", len(m.Addons), len(m.TestAddons), m.Launcher.Version, source)
@@ -389,6 +393,12 @@ func (a *App) routes() http.Handler {
 		a.lastPing = time.Now()
 		a.mu.Unlock()
 		writeJSON(w, map[string]string{"app": "TopRamenLauncher", "version": Version})
+	})
+	mux.HandleFunc("/api/bye", func(w http.ResponseWriter, r *http.Request) {
+		a.mu.Lock()
+		a.byeAt = time.Now()
+		a.mu.Unlock()
+		w.WriteHeader(204)
 	})
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, a.state())
@@ -564,10 +574,12 @@ func (a *App) install(folders []string) map[string]any {
 
 // ---------- window ----------
 
-func openWindow(url string) {
+// openWindow shows the launcher page in an Edge (or Chrome) app window and
+// returns that browser process, so main can tell when the window is closed.
+func openWindow(url string) *os.Process {
 	if runtime.GOOS != "windows" {
 		fmt.Println("Open", url)
-		return
+		return nil
 	}
 	profile := filepath.Join(dataDir(), "window")
 	var cands []string
@@ -583,11 +595,12 @@ func openWindow(url string) {
 			cmd := exec.Command(c, "--app="+url, "--window-size=860,940",
 				"--user-data-dir="+profile, "--no-first-run", "--no-default-browser-check")
 			if cmd.Start() == nil {
-				return
+				return cmd.Process
 			}
 		}
 	}
 	openDefaultBrowser(url)
+	return nil
 }
 
 func openDefaultBrowser(url string) {
@@ -654,16 +667,39 @@ func main() {
 
 	srv := &http.Server{Handler: app.routes()}
 	go srv.Serve(ln)
+	windowGone := make(chan struct{}, 1)
 	if os.Getenv("TOPRAMEN_NO_WINDOW") == "" {
-		openWindow(url)
+		if proc := openWindow(url); proc != nil {
+			// The window has its own Edge profile, so this Edge process lives
+			// exactly as long as the window. (If it quits at once, Edge handed the
+			// window to an Edge already running that profile; then we rely on
+			// the page's own signals instead.)
+			go func() {
+				t := time.Now()
+				proc.Wait()
+				if time.Since(t) > 5*time.Second {
+					windowGone <- struct{}{}
+				} else {
+					log.Println("window handed to an existing Edge process; watching the page instead")
+				}
+			}()
+		}
 		go brandTaskbar() // our own taskbar button and icon instead of Edge's
 	}
 
-	// exit once the window has been closed for a while (the page pings every 2s),
-	// or hand over to a freshly downloaded launcher
-	start := time.Now()
+	// Exit when the window closes, or hand over to a freshly downloaded
+	// launcher. Edge slows a minimized window's timers a lot, so a quiet page
+	// is NOT a sign the window was closed; only a long silence counts.
 	for {
 		select {
+		case <-windowGone:
+			app.mu.Lock()
+			busy := app.busy
+			app.mu.Unlock()
+			if !busy {
+				log.Println("window closed, exiting")
+				return
+			}
 		case finish := <-app.quit:
 			time.Sleep(700 * time.Millisecond) // let the page get its answer
 			srv.Close()
@@ -688,16 +724,17 @@ func main() {
 		app.mu.Lock()
 		idle := time.Since(app.lastPing)
 		busy := app.busy
+		said := !app.byeAt.IsZero() && time.Since(app.byeAt) > 3*time.Second && app.lastPing.Before(app.byeAt)
 		app.mu.Unlock()
-		limit := 12 * time.Second
-		if time.Since(start) < 60*time.Second {
-			limit = 60 * time.Second // give the window time to start
-		}
-		if os.Getenv("TOPRAMEN_NO_WINDOW") != "" {
+		if os.Getenv("TOPRAMEN_NO_WINDOW") != "" || busy {
 			continue
 		}
-		if !busy && idle > limit {
-			log.Println("window closed, exiting")
+		if said { // the page said goodbye and no page has spoken since (a reload would have)
+			log.Println("window said it was closing, exiting")
+			return
+		}
+		if idle > 15*time.Minute {
+			log.Println("no word from the window for 15 minutes, exiting")
 			return
 		}
 	}
