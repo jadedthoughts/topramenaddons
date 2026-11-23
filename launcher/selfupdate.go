@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -58,6 +59,9 @@ func downloadLauncher(urls ...string) ([]byte, error) {
 // a function that finishes the swap and starts the new copy; the caller runs
 // it after shutting down the web server, then exits.
 func (a *App) selfUpdate() (func() error, error) {
+	if runtime.GOOS == "darwin" {
+		return a.selfUpdateMac()
+	}
 	a.mu.Lock()
 	m, commit := a.manifest, a.commit
 	a.mu.Unlock()
@@ -114,11 +118,14 @@ func cleanupOld() {
 		return
 	}
 	old := self + ".old"
+	if app := appBundle(self); app != "" {
+		old = app + ".old"
+	}
 	for i := 0; i < 20; i++ {
 		if _, err := os.Stat(old); os.IsNotExist(err) {
 			return
 		}
-		if os.Remove(old) == nil {
+		if os.RemoveAll(old) == nil {
 			log.Println("removed", old)
 			return
 		}

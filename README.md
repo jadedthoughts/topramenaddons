@@ -29,6 +29,15 @@ Built by **Crayon Ponyfish**.
 
 Open the launcher whenever you want to check for updates. When a new launcher is out, click **Update launcher** in its window (version 1.4.0 and later) and it replaces itself and reopens. It doesn't run in the background, and it closes when you close its window.
 
+## On a Mac
+
+1. Download **[TopRamenLauncher-mac.zip](https://github.com/jadedthoughts/topramenaddons/raw/main/releases/TopRamenLauncher-mac.zip)** and open it.
+2. Drag **Top Ramen Launcher** into your **Applications** folder. (It needs to live there to update itself.)
+3. Open it. The first time, macOS says it can't check the app: click **Done**, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Top Ramen Launcher, and confirm. You only do this once.
+4. It finds `World of Warcraft/_forever_/Interface/AddOns` in Applications by itself, or click **Change…** to pick it.
+
+The window opens in Chrome, Edge or Brave as its own app window if one is installed, or in Safari otherwise.
+
 ## Install by hand
 
 Download an addon's zip from [`releases/`](releases/) and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.

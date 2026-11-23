@@ -112,6 +112,13 @@ type Manifest struct {
 		ExeAPI  string `json:"exeApi"` // the .exe through GitHub's API (always current)
 		SHA256  string `json:"sha256"` // of the .exe
 	} `json:"launcher"`
+	// The Mac launcher: a zipped .app bundle.
+	LauncherMac struct {
+		Version string `json:"version"`
+		URL     string `json:"url"`    // the zip, for downloading by hand
+		Path    string `json:"path"`   // the zip's path in the repository
+		SHA256  string `json:"sha256"` // of the zip
+	} `json:"launcherMac"`
 }
 
 type AddonState struct {
@@ -224,6 +231,15 @@ func normalizeAddOns(p string) string {
 }
 
 func detectAddOns() string {
+	if runtime.GOOS == "darwin" {
+		home, _ := os.UserHomeDir()
+		for _, r := range []string{"/Applications", filepath.Join(home, "Applications"), "/Applications/Games", "/Users/Shared"} {
+			if p := normalizeAddOns(filepath.Join(r, "World of Warcraft", "_forever_")); p != "" {
+				return p
+			}
+		}
+		return ""
+	}
 	if runtime.GOOS != "windows" {
 		return ""
 	}
@@ -332,7 +348,12 @@ func (a *App) state() State {
 		s.Addons = []AddonState{}
 		return s
 	}
-	if l := a.manifest.Launcher; l.Version != "" && Version != "dev" && compareVersions(l.Version, Version) > 0 {
+	if runtime.GOOS == "darwin" {
+		if l := a.manifest.LauncherMac; l.Version != "" && Version != "dev" && compareVersions(l.Version, Version) > 0 {
+			s.LauncherUpdate, s.LauncherURL = l.Version, l.URL
+			s.CanSelfUpdate = l.SHA256 != "" && l.Path != ""
+		}
+	} else if l := a.manifest.Launcher; l.Version != "" && Version != "dev" && compareVersions(l.Version, Version) > 0 {
 		s.LauncherUpdate, s.LauncherURL = l.Version, l.URL
 		s.CanSelfUpdate = l.SHA256 != "" && (l.Exe != "" || l.ExeAPI != "")
 	}
@@ -492,8 +513,13 @@ func (a *App) routes() http.Handler {
 		go func() { a.quit <- finish }()
 	})
 	mux.HandleFunc("/api/openFolder", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" && runtime.GOOS == "windows" && isAddOnsDir(a.cfg.AddOnsPath) {
-			exec.Command("explorer.exe", a.cfg.AddOnsPath).Start()
+		if r.Method == "POST" && isAddOnsDir(a.cfg.AddOnsPath) {
+			switch runtime.GOOS {
+			case "windows":
+				exec.Command("explorer.exe", a.cfg.AddOnsPath).Start()
+			case "darwin":
+				exec.Command("open", a.cfg.AddOnsPath).Start()
+			}
 		}
 		writeJSON(w, map[string]bool{"ok": true})
 	})
@@ -577,6 +603,9 @@ func (a *App) install(folders []string) map[string]any {
 // openWindow shows the launcher page in an Edge (or Chrome) app window and
 // returns that browser process, so main can tell when the window is closed.
 func openWindow(url string) *os.Process {
+	if runtime.GOOS == "darwin" {
+		return openWindowMac(url)
+	}
 	if runtime.GOOS != "windows" {
 		fmt.Println("Open", url)
 		return nil
@@ -616,6 +645,14 @@ func openDefaultBrowser(url string) {
 
 // browseFolder shows the Windows folder picker through PowerShell.
 func browseFolder() string {
+	if runtime.GOOS == "darwin" {
+		out, err := exec.Command("osascript", "-e",
+			`POSIX path of (choose folder with prompt "Pick your WoW Forever AddOns folder (World of Warcraft/_forever_/Interface/AddOns)")`).Output()
+		if err != nil {
+			return "" // cancelled
+		}
+		return strings.TrimSuffix(strings.TrimSpace(string(out)), "/")
+	}
 	if runtime.GOOS != "windows" {
 		return ""
 	}

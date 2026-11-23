@@ -105,7 +105,19 @@ def main():
         if os.path.exists(exe):
             launcher["sha256"] = sha256(exe)
     # test addons get their own list, so launchers older than 1.1.0 never see them
-    manifest = {"schema": 1, "addons": entries, "testAddons": test_entries, "launcher": launcher}
+    # the Mac launcher (a zipped .app), built by the GitHub workflow on a Mac
+    launcher_mac = old.get("launcherMac", {})
+    mac_zip = os.path.join(rel_dir, "TopRamenLauncher-mac.zip")
+    mac_ver = os.path.join(rel_dir, "TopRamenLauncher-mac.version")
+    if os.path.exists(mac_zip) and os.path.exists(mac_ver):
+        launcher_mac = {
+            "version": open(mac_ver).read().strip(),
+            "url": f"https://github.com/{REPO}/raw/{BRANCH}/releases/TopRamenLauncher-mac.zip",
+            "path": "releases/TopRamenLauncher-mac.zip",
+            "sha256": sha256(mac_zip),
+        }
+    manifest = {"schema": 1, "addons": entries, "testAddons": test_entries,
+                "launcher": launcher, "launcherMac": launcher_mac}
     with open(mpath, "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")

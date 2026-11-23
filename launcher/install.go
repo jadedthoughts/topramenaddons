@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -188,6 +189,9 @@ func installAddon(m ManifestAddon, addonsDir string) error {
 
 func permErr(err error) error {
 	if errors.Is(err, os.ErrPermission) {
+		if runtime.GOOS == "darwin" {
+			return fmt.Errorf("macOS didn't allow writing to the AddOns folder. Close WoW and try again; if it still fails, check the folder's permissions in Finder (Get Info) (%v)", err)
+		}
 		return fmt.Errorf("Windows didn't allow writing to the AddOns folder. Close WoW, or right-click the launcher and choose Run as administrator (%v)", err)
 	}
 	return err
