@@ -10,6 +10,7 @@ Built by **Crayon Ponyfish**.
 | Top Ramen Crafting | `/trc` | Crafting planner: what to craft to level up, what makes money, what to buy |
 | Top Ramen Explorer | `/tre` | Finds the spots you still need for the Adventure > Explorer achievements |
 | Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house, sortable columns, and a Vendor items button that sells the items you tick |
+| Top Ramen ThunderCats | `/trtc` | Plays a ThunderCats clip when you cast Shifting Power: shuffle the clips you tick or always play one, with previews and a volume slider. Clips are not included; put your own in `Interface\AddOns\TopRamenThunderCats_Sounds` |
 | Top Ramen Map *(test)* | `/trmap` | Big live minimap and whole-dungeon overview. Needs the Forever Dungeon Journal addon for its map images |
 
 **Opening them:** every Top Ramen addon shares one bowl button on the minimap. Click it for a menu of the addons you have, right-click to reopen the last one, and drag it to move it. Each row has a **Macro** button that makes a macro for your action bar. You can also type `/tr` for the menu, `/tr button` to hide or show the minimap button, or set a hotkey under Esc → Key Bindings → AddOns.

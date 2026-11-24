@@ -36,17 +36,6 @@
       "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenGear-1.20.2.zip",
       "size": 134349,
       "sha256": "7c30984cda46b787aa70738cf43a896838d805e1a24d3d162a5c6e1ded041c7c"
-    }
-  ],
-  "testAddons": [
-    {
-      "folder": "TopRamenMap",
-      "title": "Top Ramen Map",
-      "version": "0.7.0",
-      "notes": "/trmap opens a big live minimap and a whole-dungeon overview with boss pins and routes. /trmap help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.7.0.zip",
-      "size": 79162,
-      "sha256": "dd151b583ee5e7fb65747bd3a0429eebc8c593285795e77b32edfddc38b6c881"
     },
     {
       "folder": "TopRamenThunderCats",
@@ -59,6 +48,17 @@
       "keep": [
         "Sounds"
       ]
+    }
+  ],
+  "testAddons": [
+    {
+      "folder": "TopRamenMap",
+      "title": "Top Ramen Map",
+      "version": "0.7.0",
+      "notes": "/trmap opens a big live minimap and a whole-dungeon overview with boss pins and routes. /trmap help for options.",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.7.0.zip",
+      "size": 79162,
+      "sha256": "dd151b583ee5e7fb65747bd3a0429eebc8c593285795e77b32edfddc38b6c881"
     }
   ],
   "launcher": {
