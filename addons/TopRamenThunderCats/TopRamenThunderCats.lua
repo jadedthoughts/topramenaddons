@@ -45,6 +45,9 @@ local function db()
   if d.hear == nil then d.hear = true end     -- play clips my group sends
   if type(d.volume) ~= "number" then d.volume = 100 end -- % of the channel's own volume
   d.volume = math.max(5, math.min(100, math.floor(d.volume / 5 + 0.5) * 5))
+  if d.quiet == nil then d.quiet = false end           -- sometimes stay quiet on a cast
+  if type(d.chance) ~= "number" then d.chance = 50 end -- % of casts that play a clip when quiet is on
+  d.chance = math.max(10, math.min(90, math.floor(d.chance / 10 + 0.5) * 10))
   if type(d.window) ~= "table" then d.window = {} end
   return d
 end
@@ -56,6 +59,7 @@ local function trim(s) return (s or ""):gsub("^%s+", ""):gsub("%s+$", "") end
 -- playing
 ---------------------------------------------------------------------------
 local handle, lastIdx, lastFrom, warned
+local skipped -- the last cast stayed quiet
 local playEnds = 0
 local refresh = function() end
 
@@ -135,6 +139,7 @@ local function play(idx, from)
       .. "Clips go in Interface\\AddOns\\TopRamenThunderCats_Sounds (" .. clip.file .. " and so on).")
   end
   lastIdx, lastFrom = idx, from
+  skipped = false
   refresh()
 end
 ns.Play = play
@@ -152,6 +157,17 @@ local function choose()
   return list[math.random(#list)]
 end
 ns.Choose = choose
+
+-- what a cast plays: nil when "Sometimes stay quiet" says not this time (then the group hears nothing either)
+function ns.CastPick()
+  local d = db()
+  if d.quiet and math.random(100) > d.chance then
+    skipped = true
+    refresh()
+    return nil
+  end
+  return choose()
+end
 
 ---------------------------------------------------------------------------
 -- group sharing (addon messages; only people with the addon get them)
@@ -206,7 +222,7 @@ local function onCast(id)
   local now = GetTime()
   if now - firedAt < 1.5 then return end -- a channel fires both "started" and "succeeded"
   firedAt = now
-  local idx = choose()
+  local idx = ns.CastPick()
   if not idx then return end
   play(idx)
   share(idx)
@@ -216,7 +232,7 @@ end
 -- window
 ---------------------------------------------------------------------------
 local W = {}
-local WIDTH, HEIGHT = 390, 452
+local WIDTH, HEIGHT = 390, 482
 
 local function tip(f, title, body)
   f:HookScript("OnEnter", function(self)
@@ -344,9 +360,9 @@ local function build()
   end
 
   y = y - 2
-  W.test = UI.Button(f, 170, 24, "Test a cast", function() local i = choose(); if i then play(i) end end)
+  W.test = UI.Button(f, 170, 24, "Test a cast", function() local i = ns.CastPick(); if i then play(i) end end)
   W.test:SetPoint("TOPLEFT", 16, y)
-  tip(W.test, "Test a cast", "Picks a clip the way a Shifting Power cast would and plays it (just for you).")
+  tip(W.test, "Test a cast", "Does what a Shifting Power cast would (including staying quiet sometimes, if that's on) and plays it just for you.")
   W.stop = UI.Button(f, 80, 24, "Stop", stop)
   W.stop:SetPoint("LEFT", W.test, "RIGHT", 8, 0)
   W.channel = UI.Button(f, 82, 24, "", function()
@@ -387,6 +403,35 @@ local function build()
     return "How loud the clips are, as a share of your " .. db().channel .. " volume. At 100% nothing else changes. "
       .. "Lower than that, the addon turns the " .. db().channel .. " slider down while a clip plays and back up after, "
       .. "so other sounds on that channel dip for those few seconds too. Press Play while you drag to hear it."
+  end)
+
+  -- sometimes stay quiet
+  y = y - 30
+  W.quiet = UI.Button(f, 170, 24, "", function() db().quiet = not db().quiet; refresh() end)
+  W.quiet:SetPoint("TOPLEFT", 16, y)
+  tip(W.quiet, "Sometimes stay quiet", "So it doesn't get overdone: some casts play nothing at all. Use the slider to set how often a clip plays.")
+  local q = CreateFrame("Slider", nil, f, "BackdropTemplate")
+  W.chance = q
+  q:SetOrientation("HORIZONTAL")
+  q:SetSize(110, 14)
+  q:SetPoint("LEFT", W.quiet, "RIGHT", 10, 0)
+  UI.Skin(q, C.well, C.trim, 1)
+  q:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+  q:SetMinMaxValues(10, 90)
+  q:SetValueStep(10)
+  if q.SetObeyStepOnDrag then q:SetObeyStepOnDrag(true) end
+  q:EnableMouseWheel(true)
+  q:SetScript("OnMouseWheel", function(self, delta) self:SetValue(self:GetValue() + delta * 10) end)
+  q:SetScript("OnValueChanged", function(self, v)
+    v = math.floor(v / 10 + 0.5) * 10
+    db().chance = v
+    W.chanceText:SetText(ns.ChanceText(v))
+  end)
+  W.chanceText = UI.Text(f, "GameFontHighlightSmall", C.gold)
+  W.chanceText:SetPoint("LEFT", q, "RIGHT", 8, 0)
+  tip(q, "How often it plays", function()
+    local c = db().chance
+    return "A clip plays on about " .. c .. "% of your casts and stays quiet on the other " .. (100 - c) .. "%."
   end)
   tip(W.channel, "Sound channel", "Which volume slider the clips follow. Master plays even with sound effects turned off. Click to change.")
 
@@ -436,15 +481,29 @@ refresh = function()
   W.channel:SetText(d.channel)
   if W.vol:GetValue() ~= d.volume then W.vol:SetValue(d.volume) end
   W.volText:SetText(d.volume .. "%")
+  W.quiet:SetText("Sometimes stay quiet: " .. (d.quiet and "On" or "Off"))
+  if d.quiet then W.quiet:LockHighlight() else W.quiet:UnlockHighlight() end
+  W.chance:SetShown(d.quiet); W.chanceText:SetShown(d.quiet)
+  if W.chance:GetValue() ~= d.chance then W.chance:SetValue(d.chance) end
+  W.chanceText:SetText(ns.ChanceText(d.chance))
   W.share:SetText("Share my clip: " .. (d.share and "On" or "Off"))
   if d.share then W.share:LockHighlight() else W.share:UnlockHighlight() end
   W.hear:SetText("Hear the group: " .. (d.hear and "On" or "Off"))
   if d.hear then W.hear:LockHighlight() else W.hear:UnlockHighlight() end
-  if lastIdx then
+  if skipped then
+    W.status:SetText("Last cast: " .. HEX.text .. "stayed quiet|r (Sometimes stay quiet is on)")
+  elseif lastIdx then
     W.status:SetText("Last: " .. HEX.text .. CLIPS[lastIdx].name .. "|r" .. (lastFrom and (" from " .. HEX.gold .. lastFrom .. "|r") or ""))
   else
     W.status:SetText("Group members need Top Ramen ThunderCats to hear your clip.")
   end
+end
+
+-- "plays 1 in 3" style, from a percentage
+function ns.ChanceText(c)
+  local ratios = { [10] = "1 in 10", [20] = "1 in 5", [30] = "3 in 10", [40] = "2 in 5", [50] = "1 in 2",
+    [60] = "3 in 5", [70] = "7 in 10", [80] = "4 in 5", [90] = "9 in 10" }
+  return "Plays " .. (ratios[c] or (c .. "%"))
 end
 
 local function toggle()
@@ -496,8 +555,17 @@ SlashCmdList.TOPRAMENTHUNDERCATS = function(msg)
     local v = tonumber(trim(msg):match("%S+%s+(%d+)"))
     if v then d.volume = math.max(5, math.min(100, math.floor(v / 5 + 0.5) * 5)); volumeChanged(); refresh() end
     say("clip volume: " .. d.volume .. "% of your " .. d.channel .. " volume.")
+  elseif cmd == "quiet" then
+    local arg = trim(msg):lower():match("%S+%s+(%S+)")
+    local v = tonumber(arg or "")
+    if v then d.quiet = true; d.chance = math.max(10, math.min(90, math.floor(v / 10 + 0.5) * 10))
+    elseif arg == "off" then d.quiet = false
+    elseif arg == "on" then d.quiet = true
+    else d.quiet = not d.quiet end
+    say("sometimes stay quiet: " .. (d.quiet and ("on, " .. ns.ChanceText(d.chance):lower() .. " casts") or "off") .. ".")
+    refresh()
   elseif cmd == "on" or cmd == "off" then d.enabled = (cmd == "on"); say("clip on " .. d.spell .. ": " .. cmd .. "."); refresh()
   else
-    say("/trtc opens the window. /trtc test plays a clip the way a cast would. /trtc stop. /trtc on, /trtc off. /trtc volume 5-100.")
+    say("/trtc opens the window. /trtc test plays a clip the way a cast would. /trtc stop. /trtc on, /trtc off. /trtc volume 5-100. /trtc quiet (on/off), or /trtc quiet 30 to play on 30% of casts.")
   end
 end
