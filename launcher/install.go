@@ -167,6 +167,17 @@ func installAddon(m ManifestAddon, addonsDir string) error {
 		return fmt.Errorf("the zip has no %s.toc", m.Folder)
 	}
 
+	// carry over the player's own folders (e.g. Sounds) from the installed copy
+	for _, k := range m.Keep {
+		k = filepath.Clean(k)
+		if k == "." || filepath.IsAbs(k) || strings.HasPrefix(k, "..") || strings.ContainsAny(k, `:`) {
+			continue
+		}
+		if err := mergeDir(filepath.Join(final, k), filepath.Join(stage, k)); err != nil {
+			return fmt.Errorf("couldn't keep your %s folder, so nothing was changed (%v)", k, err)
+		}
+	}
+
 	hadOld := false
 	if _, err := os.Stat(final); err == nil {
 		if err := os.Rename(final, old); err != nil {
@@ -185,6 +196,47 @@ func installAddon(m ManifestAddon, addonsDir string) error {
 		os.RemoveAll(old)
 	}
 	return nil
+}
+
+// mergeDir copies every file under src into dst, except files the new
+// version itself ships (those are updated). A missing src is fine.
+func mergeDir(src, dst string) error {
+	if st, err := os.Stat(src); err != nil || !st.IsDir() {
+		return nil
+	}
+	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		out := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(out, 0o755)
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		if _, err := os.Stat(out); err == nil {
+			return nil // the new version has its own copy of this file
+		}
+		in, err := os.Open(p)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		w, err := os.OpenFile(out, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(w, in); err != nil {
+			w.Close()
+			return err
+		}
+		return w.Close()
+	})
 }
 
 func permErr(err error) error {

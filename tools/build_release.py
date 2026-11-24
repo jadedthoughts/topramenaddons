@@ -82,6 +82,9 @@ def main():
         else:
             print("exists", zname)
         notes = re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", t.get("Notes", ""))
+        # "## X-TR-Keep: Sounds, Other" lists folders of the player's own files
+        # that the launcher must carry over when it updates the addon
+        keep = [k.strip() for k in t.get("X-TR-Keep", "").split(",") if k.strip()]
         (test_entries if name in test else entries).append({
             "folder": name,
             "title": t.get("Title", name),
@@ -90,6 +93,7 @@ def main():
             "url": RAW + "releases/" + zname,
             "size": os.path.getsize(zpath),
             "sha256": sha256(zpath),
+            **({"keep": keep} if keep else {}),
         })
     launcher = old.get("launcher", {})
     lver_file = os.path.join(ROOT, "launcher", "VERSION")

@@ -5,7 +5,15 @@ local ADDON, ns = ...
 local UI = ns.UI
 local C, HEX = UI.C, UI.HEX
 
-local SOUND_DIR = "Interface\\AddOns\\" .. ADDON .. "\\Sounds\\"
+-- Clips are looked for in two places, in this order:
+--  1. Interface\AddOns\TopRamenThunderCats_Sounds\  (a folder of its own, which
+--     addon updates never touch: the safest place for your clips)
+--  2. Interface\AddOns\TopRamenThunderCats\Sounds\  (inside the addon; the
+--     Top Ramen launcher keeps this folder when it updates the addon)
+local SOUND_DIRS = {
+  "Interface\\AddOns\\" .. ADDON .. "_Sounds\\",
+  "Interface\\AddOns\\" .. ADDON .. "\\Sounds\\",
+}
 local CLIPS = {
   { file = "ThunderCats1.mp3", name = "Clip 1", len = "9.6s", secs = 9.6 },
   { file = "ThunderCats2.mp3", name = "Clip 2", len = "9.8s", secs = 9.8 },
@@ -108,7 +116,11 @@ local function play(idx, from)
   if not clip then return end
   stop()
   dimFor(clip.secs)
-  local ok, willPlay, h = pcall(PlaySoundFile, SOUND_DIR .. clip.file, db().channel)
+  local ok, willPlay, h
+  for _, dir in ipairs(SOUND_DIRS) do
+    ok, willPlay, h = pcall(PlaySoundFile, dir .. clip.file, db().channel)
+    if ok and willPlay then break end
+  end
   if ok and willPlay then
     handle = h
     playEnds = GetTime() + clip.secs
@@ -119,7 +131,8 @@ local function play(idx, from)
   if not (ok and willPlay) and not warned then
     warned = true
     say("the clip didn't play. Check that the " .. db().channel .. " sound channel is on (Esc > System > Sound), or pick another channel in /trtc. "
-      .. "If you just installed the addon, quit and restart WoW: a /reload doesn't pick up new sound files.")
+      .. "If you just installed the addon, quit and restart WoW: a /reload doesn't pick up new sound files. "
+      .. "Clips go in Interface\\AddOns\\TopRamenThunderCats_Sounds (" .. clip.file .. " and so on).")
   end
   lastIdx, lastFrom = idx, from
   refresh()

@@ -99,6 +99,9 @@ type ManifestAddon struct {
 	URL     string `json:"url"`
 	Size    int64  `json:"size"`
 	SHA256  string `json:"sha256"`
+	// folders inside the addon holding the player's own files (e.g. Sounds),
+	// carried over from the installed copy when the addon is updated
+	Keep []string `json:"keep"`
 }
 
 type Manifest struct {

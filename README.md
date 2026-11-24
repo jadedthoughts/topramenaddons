@@ -48,6 +48,8 @@ Download an addon's zip from [`releases/`](releases/) and unzip it into `World o
 2. Run `python3 tools/build_release.py`. This builds `releases/<Addon>-<version>.zip` and updates `manifest.json`, which is what the launcher reads.
 3. Commit and push. Launchers see the new version within a few minutes.
 
+**Players' own files:** an addon can list folders of the player's own files in its `.toc`, for example `## X-TR-Keep: Sounds`. The launcher (1.13.0 and later) carries those folders over when it updates the addon. Top Ramen ThunderCats also reads clips from `Interface\AddOns\TopRamenThunderCats_Sounds`, a separate folder no update ever touches.
+
 **Test or released?** `channels.json` lists the addons that are still in testing. Only people who tick "Show test addons" see those. To release one to everyone, remove its name from that list and run the build again.
 
 To release a new launcher: raise `launcher/VERSION` and push. The **Sign launcher** GitHub workflow builds it on Windows, signs it with Azure Artifact Signing (so Windows Smart App Control allows it), and commits the signed `.exe`, `.zip` and `manifest.json`. Older launchers then show a "new launcher available" notice. Don't commit an unsigned build from `tools/build_launcher.sh` over the signed one: that script is only for local testing.
