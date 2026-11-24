@@ -69,9 +69,9 @@
     "sha256": "bde6a9c589126a9cece6ded131252f2f56ebcffff9942dfb8de6d9c6bcfbd0fc"
   },
   "launcherMac": {
-    "version": "1.12.0",
+    "version": "1.13.0",
     "url": "https://github.com/jadedthoughts/topramenaddons/raw/main/releases/TopRamenLauncher-mac.zip",
     "path": "releases/TopRamenLauncher-mac.zip",
-    "sha256": "1391878f162669f9687c414468c11f1c33ca46f1d5ec64f5ae9486c6e3e31f86"
+    "sha256": "bd7ee275b125577a82b62eac35f4459dd93e29b043ed4b65b4ff4b3dc347b9be"
   }
 }
