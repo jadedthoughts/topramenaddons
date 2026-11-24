@@ -227,7 +227,7 @@ end
 local function PaintStatus()
   if not data then return end
   local left = 0
-  for _, b in ipairs(data.bosses) do if not b.rare and not Dead(b) then left = left + 1 end end
+  for _, b in ipairs(data.bosses) do if not b.rare and not b.quest and not Dead(b) then left = left + 1 end end
   local multi = #data.floors > 1
   local where
   if current then
@@ -421,6 +421,7 @@ local function MakePin()
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(b.name, C.gold[1], C.gold[2], C.gold[3])
     if b.rare then GameTooltip:AddLine("Rare, may not be up", C.muted[1], C.muted[2], C.muted[3]) end
+    if b.quest then GameTooltip:AddLine("Quest target" .. (b.note and (": " .. b.note) or ""), C.muted[1], C.muted[2], C.muted[3]) end
     local ba = BossArea(b)
     if ba then GameTooltip:AddLine(ba.name, C.text[1], C.text[2], C.text[3]) end
     if Dead(b) then GameTooltip:AddLine("Dead", C.red[1], C.red[2], C.red[3]) end

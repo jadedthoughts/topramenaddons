@@ -2,7 +2,7 @@
 ## Title: Top Ramen Map
 ## Notes: /trmap opens a big live minimap and a whole-dungeon overview with boss pins and routes. /trmap help for options.
 ## Author: Top Ramen
-## Version: 0.6.3
+## Version: 0.7.0
 ## SavedVariables: TopRamenMapDB, TopRamenLauncherDB
 ## OptionalDeps: ForeverDungeonJournal
 ## X-Notes: Dungeon map images come from Forever Dungeon Journal, which must be installed for the overview.

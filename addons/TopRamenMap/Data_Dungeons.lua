@@ -206,3 +206,28 @@ D["The Drowned City"] = {
     { name = "Min'loth the Serpent", portrait = 142322, floor = 1, x = 0.196, y = 0.539 },
   },
 }
+
+---------------------------------------------------------------------------
+-- Krol'dok Stronghold (Forever). Boss spots are the Journal's (falling/
+-- Ekiroth's numbered map, bosses in fighting order, with M's Nar'gurk
+-- correction). No area names are printed on this map: place them in game
+-- with Ctrl-click. Tunk and Zalfan Moonshadow are quest targets, not bosses.
+D["Krol'dok Stronghold"] = {
+  floors = { { art = FDJ .. "KroldokMap", texRight = 1, texBottom = 683 / 1024 } },
+  areas = {},
+  markers = {
+    { floor = 1, x = 0.205, y = 0.807, label = "Entrance" },
+  },
+  bosses = {
+    { name = "Slavecrusher Grox",         portrait = 141217, floor = 1, x = 0.331, y = 0.703 },
+    { name = "Twilight Commander Zarmok", portrait = 141219, floor = 1, x = 0.392, y = 0.734 },
+    { name = "War Handler Ashka",         portrait = 141443, floor = 1, x = 0.621, y = 0.527 },
+    { name = "Nar'gurk",                  portrait = 141215, floor = 1, x = 0.381, y = 0.526 },
+    { name = "Bossman Toof",              portrait = 14424,  floor = 1, x = 0.617, y = 0.432 },
+    { name = "Overlord Mugg",             portrait = 141218, floor = 1, x = 0.688, y = 0.242 },
+    { name = "Tunk",              portrait = 144671, floor = 1, x = 0.691, y = 0.493, quest = true,
+      note = "ogre blacksmith, starts the Key Ingredients chain" },
+    { name = "Zalfan Moonshadow", portrait = 145448, floor = 1, x = 0.430, y = 0.495, quest = true,
+      note = "Vengeance of the Highborne; he walks around" },
+  },
+}
