@@ -40,11 +40,11 @@
     {
       "folder": "TopRamenThunderCats",
       "title": "Top Ramen ThunderCats",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "notes": "/trtc opens the ThunderCats window. When you cast Shifting Power it plays a ThunderCats clip: shuffle between the clips you tick, or always play the one you pick. Play buttons let you hear each clip first, and a volume slider sets how loud they are. Sometimes stay quiet skips some casts so it doesn't get overdone.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenThunderCats-1.2.0.zip",
-      "size": 63864,
-      "sha256": "0c1eb02b035e34f8b71401d3730ae75096bd75fddf91e5d0a53f5f9ef0197ea5",
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenThunderCats-1.2.1.zip",
+      "size": 64446,
+      "sha256": "8273ba52b4db31e29759709bab0db382c0af4cb638b05ed8472be1128ea70eb0",
       "keep": [
         "Sounds"
       ]

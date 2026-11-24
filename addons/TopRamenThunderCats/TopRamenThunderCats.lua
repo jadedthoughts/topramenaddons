@@ -60,6 +60,9 @@ local function trim(s) return (s or ""):gsub("^%s+", ""):gsub("%s+$", "") end
 ---------------------------------------------------------------------------
 local handle, lastIdx, lastFrom, warned
 local skipped -- the last cast stayed quiet
+local startedAt = -100 -- when the current clip started
+local debugOn = false
+local function debug(msg) if debugOn then print(HEX.dim .. "TRTC debug|r: " .. msg) end end
 local playEnds = 0
 local refresh = function() end
 
@@ -115,9 +118,19 @@ end
 ns.Stop = stop
 
 -- from: nil for you, or the group member's name
-local function play(idx, from)
+-- why: what asked for it (for /trtc debug). force: a button you clicked, which always restarts.
+-- Anything else is ignored when a clip started under 1.5 seconds ago, so one cast can't start
+-- the clip twice (that cuts the first start off and sounds like a stutter).
+local function play(idx, from, why, force)
   local clip = CLIPS[idx]
   if not clip then return end
+  local since = GetTime() - startedAt
+  if not force and since < 1.5 then
+    debug(string.format("ignored %s (%s): a clip started %.2fs ago", clip.name, why or "?", since))
+    return
+  end
+  debug(string.format("playing %s (%s)", clip.name, why or "?"))
+  startedAt = GetTime()
   stop()
   dimFor(clip.secs)
   local ok, willPlay, h
@@ -177,25 +190,34 @@ local function groupChannel()
   if (IsInGroup and IsInGroup()) or (GetNumPartyMembers and GetNumPartyMembers() > 0) then return "PARTY" end
 end
 
+local sentTags = {} -- tags on my own messages, so an echo of one is never played
 local function share(idx)
   if not db().share then return end
   local ch = groupChannel()
   if not ch then return end
   local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-  if send then pcall(send, PREFIX, "P1:" .. idx, ch) end
+  local tag = tostring(math.random(100000, 999999))
+  sentTags[tag] = true
+  if send then pcall(send, PREFIX, "P1:" .. idx .. ":" .. tag, ch) end
+  debug("sent " .. CLIPS[idx].name .. " to " .. ch)
 end
 
 local heardAt = {}
 local function received(msg, sender)
   if not db().hear then return end
-  local name = Ambiguate and Ambiguate(sender or "", "none") or sender
-  if name == UnitName("player") then return end
-  local idx = tonumber((msg or ""):match("^P%d+:(%d+)"))
+  local name = Ambiguate and Ambiguate(sender or "", "none") or (sender or "")
+  local me = UnitName("player")
+  local n, tag = (msg or ""):match("^P%d+:(%d+):?(%w*)")
+  if name == me or (name:match("^([^%-]+)") == me) or (tag ~= "" and sentTags[tag]) then
+    debug("ignored my own message coming back (" .. tostring(sender) .. ")")
+    return
+  end
+  local idx = tonumber(n)
   if not idx or not CLIPS[idx] then return end
   local now = GetTime()
   if heardAt[name] and now - heardAt[name] < 1.5 then return end
   heardAt[name] = now
-  play(idx, name)
+  play(idx, name, "group: " .. name)
 end
 
 ---------------------------------------------------------------------------
@@ -213,9 +235,10 @@ local function spellName(id)
   if GetSpellInfo then return (GetSpellInfo(id)) end
 end
 
-local function onCast(id)
+local function onCast(id, event)
   local name = spellName(id)
   if not name then return end
+  if name:lower() == trim(db().spell):lower() then debug(name .. " cast seen (" .. tostring(event) .. ")") end
   if name ~= lastSpell then lastSpell = name; refresh() end
   local d = db()
   if not d.enabled or name:lower() ~= trim(d.spell):lower() then return end
@@ -224,7 +247,7 @@ local function onCast(id)
   firedAt = now
   local idx = ns.CastPick()
   if not idx then return end
-  play(idx)
+  play(idx, nil, "your cast")
   share(idx)
 end
 
@@ -350,7 +373,7 @@ local function build()
     r.len = UI.Text(r, "GameFontHighlightSmall", C.muted)
     r.len:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
     r.len:SetText(clip.len)
-    r.play = UI.Button(r, 64, 20, "Play", function() play(i) end)
+    r.play = UI.Button(r, 64, 20, "Play", function() play(i, nil, "Play button", true) end)
     r.play:SetPoint("RIGHT", -4, 0)
     tip(r.play, "Play " .. clip.name, "Plays it just for you, so you can choose.")
     r.now = UI.Text(r, "GameFontHighlightSmall", C.gold)
@@ -360,7 +383,7 @@ local function build()
   end
 
   y = y - 2
-  W.test = UI.Button(f, 170, 24, "Test a cast", function() local i = ns.CastPick(); if i then play(i) end end)
+  W.test = UI.Button(f, 170, 24, "Test a cast", function() local i = ns.CastPick(); if i then play(i, nil, "Test a cast", true) end end)
   W.test:SetPoint("TOPLEFT", 16, y)
   tip(W.test, "Test a cast", "Does what a Shifting Power cast would (including staying quiet sometimes, if that's on) and plays it just for you.")
   W.stop = UI.Button(f, 80, 24, "Stop", stop)
@@ -528,7 +551,7 @@ else
 end
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
   if event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_CHANNEL_START" then
-    if a1 == "player" then onCast(a3) end
+    if a1 == "player" then onCast(a3, event) end
   elseif event == "CHAT_MSG_ADDON" then
     if a1 == PREFIX then received(a2, a4) end
   elseif event == "PLAYER_LOGOUT" then
@@ -549,12 +572,15 @@ SlashCmdList.TOPRAMENTHUNDERCATS = function(msg)
   local cmd = trim(msg):lower():match("^(%S*)")
   local d = db()
   if cmd == "" then toggle()
-  elseif cmd == "test" then local i = choose(); if i then play(i) else say("no clips ticked in the pool.") end
+  elseif cmd == "test" then local i = choose(); if i then play(i, nil, "/trtc test", true) else say("no clips ticked in the pool.") end
   elseif cmd == "stop" then stop()
   elseif cmd == "volume" then
     local v = tonumber(trim(msg):match("%S+%s+(%d+)"))
     if v then d.volume = math.max(5, math.min(100, math.floor(v / 5 + 0.5) * 5)); volumeChanged(); refresh() end
     say("clip volume: " .. d.volume .. "% of your " .. d.channel .. " volume.")
+  elseif cmd == "debug" then
+    debugOn = not debugOn
+    say("debug messages " .. (debugOn and "on: each clip start (and anything ignored) shows in chat." or "off."))
   elseif cmd == "quiet" then
     local arg = trim(msg):lower():match("%S+%s+(%S+)")
     local v = tonumber(arg or "")
@@ -566,6 +592,6 @@ SlashCmdList.TOPRAMENTHUNDERCATS = function(msg)
     refresh()
   elseif cmd == "on" or cmd == "off" then d.enabled = (cmd == "on"); say("clip on " .. d.spell .. ": " .. cmd .. "."); refresh()
   else
-    say("/trtc opens the window. /trtc test plays a clip the way a cast would. /trtc stop. /trtc on, /trtc off. /trtc volume 5-100. /trtc quiet (on/off), or /trtc quiet 30 to play on 30% of casts.")
+    say("/trtc opens the window. /trtc test plays a clip the way a cast would. /trtc stop. /trtc on, /trtc off. /trtc volume 5-100. /trtc quiet (on/off), or /trtc quiet 30 to play on 30% of casts. /trtc debug shows what starts each clip.")
   end
 end
