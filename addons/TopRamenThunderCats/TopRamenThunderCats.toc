@@ -1,0 +1,19 @@
+## Interface: 16001
+## Title: Top Ramen ThunderCats
+## Notes: /trtc opens the ThunderCats window. When you cast Shifting Power it plays a ThunderCats clip: shuffle between the clips you tick, or always play the one you pick. Play buttons let you hear each clip first, and a volume slider sets how loud they are.
+## Author: Top Ramen
+## Version: 1.1.0
+## IconTexture: Interface\AddOns\TopRamenThunderCats\Media\trIcon
+## SavedVariables: TopRamenThunderCatsDB, TopRamenLauncherDB
+## AddonCompartmentFunc: TopRamenThunderCats_TRLaunch
+## X-TR-Letter: T
+## X-TR-Label: ThunderCats
+## X-TR-Cmd: /trtc
+## X-TR-Slash: TOPRAMENTHUNDERCATS
+## X-TR-Color: e0322b
+## X-TR-Icon: Ability_Druid_CatForm
+## X-TR-Order: 6
+
+TRUI.lua
+TopRamenThunderCats.lua
+TRLauncher.lua

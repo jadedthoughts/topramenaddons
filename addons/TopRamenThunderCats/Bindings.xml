@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENTHUNDERCATS_OPEN" header="TOPRAMENTHUNDERCATS" category="ADDONS">
+    TopRamenThunderCats_TRLaunch()
+  </Binding>
+</Bindings>
