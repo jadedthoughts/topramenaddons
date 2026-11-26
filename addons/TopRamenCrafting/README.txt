@@ -37,6 +37,9 @@ TABS
   and where, a grand total, your gold, what's left after buying, and what you'll have
   after vending what you craft. Hover a material to see what it's for.
   "Clear all selected" unticks everything.
+- Recipes: every recipe you know. Tick any of them and set how many (Make), whatever
+  their skill-ups or profit, and the materials go on the Shopping list. Find recipe
+  searches by name; Untick all clears this tab's ticks.
 - Vendor flips: everything on the auction house priced below what a vendor pays for it,
   from your last scan, with the profit if you buy those listings and vendor them. With
   the auction house open, Open shows the item in the auction window. Cheap listings sell

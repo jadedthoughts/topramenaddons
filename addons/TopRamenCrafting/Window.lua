@@ -204,6 +204,7 @@ end
 local LAYOUT = {
   plan = { { 0, .34, "LEFT" }, { .35, .07, "RIGHT" }, { .43, .07, "RIGHT" }, { .51, .15, "RIGHT" }, { .67, .16, "RIGHT" }, { .84, .16, "RIGHT" } },
   money = { { 0, .38, "LEFT" }, { .39, .15, "RIGHT" }, { .55, .17, "RIGHT" }, { .73, .13, "RIGHT" } },
+  pick = { { 0, .38, "LEFT" }, { .39, .15, "RIGHT" }, { .55, .17, "RIGHT" }, { .73, .13, "RIGHT" } },
   shop = { { 0, .30, "LEFT" }, { .31, .07, "RIGHT" }, { .39, .08, "RIGHT" }, { .48, .07, "RIGHT" }, { .57, .17, "LEFT" }, { .75, .25, "RIGHT" } },
   guild = { { 0, .34, "LEFT" }, { .35, .20, "LEFT" }, { .56, .13, "RIGHT" }, { .70, .11, "RIGHT" }, { .84, .16, "LEFT" } },
   flips = { { 0, .36, "LEFT" }, { .37, .12, "RIGHT" }, { .50, .15, "RIGHT" }, { .66, .15, "RIGHT" }, { .82, .18, "RIGHT" } },
@@ -218,13 +219,14 @@ end
 
 -- pixel position and width of a column; money-maker columns leave room for the + / - controls
 local function colPos(name, col)
-  local left = (name == "plan" or name == "money" or name == "flips") and CHECK_W or 0
-  local w = listWidth() - left - (name == "money" and MAKE_W or 0) - ((name == "guild" or name == "flips") and OPEN_W or 0)
+  local left = (name == "plan" or name == "money" or name == "pick" or name == "flips") and CHECK_W or 0
+  local w = listWidth() - left - ((name == "money" or name == "pick") and MAKE_W or 0) - ((name == "guild" or name == "flips") and OPEN_W or 0)
   return 4 + left + col[1] * w, col[2] * w
 end
 local HEADERS = {
   plan = { "Recipe", "Crafts", "Points", "Materials", "Sells for", "Net" },
   money = { "Recipe", "Materials", "Sells for", "Profit each" },
+  pick = { "Recipe", "Materials each", "Sells for", "Profit each" },
   shop = { "Material", "Need", "Have", "Buy", "Where", "Total" },
   guild = { "Guildmate", "Profession", "Skill", "Recipes", "Link" },
   flips = { "Item", "Cheap units", "AH price", "Vendor pays", "Profit" },
@@ -364,6 +366,7 @@ end
 local function picks(c, prof)
   c.picks = c.picks or {}
   c.picks[prof] = c.picks[prof] or { plan = {}, money = {} }
+  c.picks[prof].make = c.picks[prof].make or {} -- recipes ticked on the Recipes tab
   return c.picks[prof]
 end
 
@@ -371,6 +374,13 @@ local function makeQty(c, prof)
   c.makeQty = c.makeQty or {}
   c.makeQty[prof] = c.makeQty[prof] or {}
   return c.makeQty[prof]
+end
+
+-- how many of each recipe ticked on the Recipes tab
+local function pickQty(c, prof)
+  c.pickQty = c.pickQty or {}
+  c.pickQty[prof] = c.pickQty[prof] or {}
+  return c.pickQty[prof]
 end
 
 local function renderButtons(c, skills, sel)
@@ -913,6 +923,11 @@ local function render()
     for _, r in ipairs(recipes) do
       if pick.money[r.name] then extra[#extra + 1] = { recipe = r, n = math.max(1, qty[r.name] or 1) } end
     end
+    local pq = pickQty(c, sel)
+    local chosen = {}
+    for _, r in ipairs(recipes) do
+      if pick.make[r.name] then chosen[#chosen + 1] = { recipe = r, n = math.max(1, pq[r.name] or 1) } end
+    end
 
     W.header:Show()
     local hdr, lay = HEADERS[tab], LAYOUT[tab]
@@ -924,7 +939,7 @@ local function render()
         fs:SetWidth(w); fs:SetJustifyH(lay[i][3]); fs:SetText(DIM .. hdr[i] .. "|r"); fs:Show()
       else fs:Hide() end
     end
-    if tab == "plan" or tab == "money" then W.headerBuy:Show() else W.headerBuy:Hide() end
+    if tab == "plan" or tab == "money" or tab == "pick" then W.headerBuy:Show() else W.headerBuy:Hide() end
     if tab == "money" then
       W.headerCols[5]:ClearAllPoints(); W.headerCols[5]:SetPoint("LEFT", W.header, "LEFT", listWidth() - MAKE_W + 8, 0)
       W.headerCols[5]:SetWidth(MAKE_W - 8); W.headerCols[5]:SetJustifyH("CENTER"); W.headerCols[5]:SetText(DIM .. "Make|r"); W.headerCols[5]:Show()
@@ -1008,12 +1023,50 @@ local function render()
         end
       end
 
+    elseif tab == "pick" then
+      -- every recipe you know: tick any of them and set how many, regardless of skill-ups or profit
+      local q = W.pickSearch and (W.pickSearch:GetText() or ""):lower() or ""
+      local list = {}
+      for _, r in ipairs(recipes) do
+        if q == "" or r.name:lower():find(q, 1, true) then list[#list + 1] = r end
+      end
+      table.sort(list, function(a, b) return a.name < b.name end)
+      local ticked = 0
+      for _ in pairs(pick.make) do ticked = ticked + 1 end
+      W.summary:SetText(("%d recipes known    %d ticked\n%s"):format(#recipes, ticked,
+        DIM .. "Tick anything you want to make and set how many; it goes on the Shopping list.|r"))
+      for _, r in ipairs(list) do
+        local nq = math.max(1, pq[r.name] or 1)
+        local cost1, missing = pl:recipeCost(r)
+        local cost = (#missing == 0) and ((pl:batchCost(r, nq) or cost1 * nq) / nq) or nil
+        local value, where = pl:payout(r)
+        setRow(n + 1, "pick", {
+          (DIFF_COLOR[r.diff] or "") .. r.name .. "|r" .. DIM .. "  " .. dur(r.cast) .. "|r",
+          cost and money(cost) or (BAD .. "no price|r"),
+          (value and value > 0) and (money(value) .. (where == "ah" and (DIM .. " AH|r") or "")) or (DIM .. "-|r"),
+          (cost and value and value > 0) and money(value - cost, true) or "",
+        }, r.out, { value = nq, fn = function(_, d)
+          pq[r.name] = math.max(1, math.min(999, nq + d))
+          if d > 0 then pick.make[r.name] = true end
+          ns.RefreshWindow()
+        end, set = function(v)
+          pq[r.name] = math.max(1, math.min(999, v))
+          pick.make[r.name] = true -- typing a number means you want it
+        end }, nil, { checked = pick.make[r.name] and true or false, fn = function(v)
+          pick.make[r.name] = v or nil
+          ns.RefreshWindow()
+        end })
+        n = n + 1
+      end
+      if #list == 0 then line(DIM .. (q ~= "" and ("No known recipe matches \"" .. q .. "\".") or "No recipes recorded yet: open this profession once.") .. "|r") end
+
     else -- shopping
       local crafts, source = {}, {}
       for _, x in ipairs(plan.crafts) do
         if pick.plan[x.recipe.name] then crafts[#crafts + 1] = x; source[#crafts] = "skill-up plan" end
       end
       for _, x in ipairs(extra) do crafts[#crafts + 1] = x; source[#crafts] = "money maker" end
+      for _, x in ipairs(chosen) do crafts[#crafts + 1] = x; source[#crafts] = "your pick" end
       local sh = pl:shopping(crafts)
       -- which crafts need each material (directly, or through a reagent you'll make first)
       local usedFor = {}
@@ -1155,6 +1208,12 @@ local function render()
     W.createList:Hide(); W.clearPicks:Hide()
   end
   if tab == "flips" then W.flipReagents:SetChecked(settings().flipReagents and true or false); W.flipReagents:Show() else W.flipReagents:Hide() end
+  if tab == "pick" then
+    W.pickSearch:Show(); W.pickSearchLabel:Show(); W.pickClear:Show()
+    W.summary:SetPoint("RIGHT", frame, "RIGHT", -250, 0)
+  else
+    W.pickSearch:Hide(); W.pickSearchLabel:Hide(); W.pickClear:Hide()
+  end
   if tab == "money" then W.maxMake:Show(); W.resetMake:Show(); W.bestMake:Show()
   else W.maxMake:Hide(); W.resetMake:Hide(); W.bestMake:Hide() end
   if tab == "guild" then
@@ -1172,7 +1231,7 @@ local function render()
     W.summary:SetPoint("RIGHT", frame, "RIGHT", -250, 0)
   else
     W.guildRefresh:Hide(); W.guildSearch:Hide(); W.guildSearchLabel:Hide()
-    W.summary:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+    if tab ~= "pick" then W.summary:SetPoint("RIGHT", frame, "RIGHT", -20, 0) end
   end
   if ns.RefreshShopPanel then ns.RefreshShopPanel() end
 end
@@ -1207,8 +1266,10 @@ function ns.CurrentShopping()
   local pick, qty = picks(c, sel), makeQty(c, sel)
   local crafts = {}
   for _, x in ipairs(plan.crafts) do if pick.plan[x.recipe.name] then crafts[#crafts + 1] = x end end
+  local pq = pickQty(c, sel)
   for _, r in ipairs(recipes) do
     if pick.money[r.name] then crafts[#crafts + 1] = { recipe = r, n = math.max(1, qty[r.name] or 1) } end
+    if pick.make[r.name] then crafts[#crafts + 1] = { recipe = r, n = math.max(1, pq[r.name] or 1) } end
   end
   local sh = pl:shopping(crafts)
   local buy = {}
@@ -1379,8 +1440,9 @@ local function build()
   -- tabs
   W.tabs = {}
   local prev
-  for _, t in ipairs({ { "plan", "Skill-up plan" }, { "money", "Money makers" }, { "shop", "Shopping list" }, { "flips", "Vendor flips" }, { "guild", "Guild" } }) do
-    local b = button(frame, t[2], 140, 28, function() tab = t[1]; ns.RefreshWindow() end)
+  for _, t in ipairs({ { "plan", "Skill-up plan" }, { "money", "Money makers" }, { "pick", "Recipes" }, { "shop", "Shopping list" },
+                       { "flips", "Vendor flips" }, { "guild", "Guild" } }) do
+    local b = button(frame, t[2], 122, 28, function() tab = t[1]; ns.RefreshWindow() end)
     if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", 14, -222) end
     W.tabs[t[1]] = b
     prev = b
@@ -1470,6 +1532,23 @@ local function build()
     b:SetPoint("BOTTOMLEFT", 14, 12)
     W.guildRefresh = b
   end
+  -- Recipes tab: search, and untick everything ticked there
+  W.pickSearch = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+  W.pickSearch:SetSize(170, 20)
+  W.pickSearch:SetAutoFocus(false)
+  W.pickSearch:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -24, -268)
+  W.pickSearch:SetScript("OnTextChanged", function() ns.RefreshWindow() end)
+  W.pickSearch:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+  W.pickSearch:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+  W.pickSearchLabel = label(frame, "Find recipe", "GameFontHighlightSmall")
+  W.pickSearchLabel:SetPoint("RIGHT", W.pickSearch, "LEFT", -10, 0)
+  W.pickClear = button(frame, "Untick all", 110, 26, function()
+    local c = ns.charData()
+    if c and c.selected and c.picks and c.picks[c.selected] then c.picks[c.selected].make = {} end
+    ns.RefreshWindow()
+  end)
+  W.pickClear:SetPoint("BOTTOMLEFT", 14, 12)
+  W.pickSearch:Hide(); W.pickSearchLabel:Hide(); W.pickClear:Hide()
   W.guildSearch = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
   W.guildSearch:SetSize(170, 20)
   W.guildSearch:SetAutoFocus(false)
