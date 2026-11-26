@@ -30,10 +30,12 @@ local ORDER = { "head", "neck", "shoulder", "back", "chest", "wrist", "hands", "
 local SLOTNAME = { head = "Head", neck = "Neck", shoulder = "Shoulder", back = "Back", chest = "Chest", wrist = "Wrist",
   hands = "Hands", waist = "Waist", legs = "Legs", feet = "Feet", finger = "Rings", trinket = "Trinkets",
   weapon2h = "Two-hand weapons", weapon1h = "One-hand weapons", offhand = "Off-hand", relic = "Relic",
-  ranged = "Ranged", offweapon = "Off-hand weapons", shield = "Shields" }
+  ranged = "Ranged", offweapon = "Off-hand weapons", shield = "Shields",
+  pairs = "Main hand + off-hand pairs" }
 
 local page, scroll, content, specs
-local rows, heads = {}, {}
+local rows, heads, pairRows = {}, {}, {}
+local HAND, pairs_ -- the pairs (set below)
 local reading = nil -- { total, done } while a scan is being read
 local waitingSince = nil -- GetTime() when we asked the game for a full scan, until it arrives
 local UI, C, HX
@@ -205,11 +207,82 @@ end
 ---------------------------------------------------------------------------
 -- the upgrades: top 5 per slot
 ---------------------------------------------------------------------------
+-- 1.23.0: main hand + off-hand pairs. Every one-hander you could buy (or are wearing) is tried with every
+-- off-hand you could buy (or are wearing): a held-in-hand item, a shield, or for dual wielders a second weapon.
+-- Scored together against what you wear in both hands now, so a pair can be compared with a two-hander.
+HAND = { weapon1h = true, offhand = true, shield = true, offweapon = true }
+local PAIRS_SHOWN, POOL = 3, 12
+pairs_ = function(mode, hands)
+  local R = ns.CLASS_RULES[ns.PlayerClass() or "DRUID"] or {}
+  if not (R.offhand or R.shield or R.dual) then return {} end
+  local g = ns.Gear and ns.Gear() or {}
+  local base = ns.BaseWithout({ [16] = true, [17] = true })
+  local old = ns.Score({ g[16], ns.AsOffhand(g[17]) }, mode, base, 1)
+  local co = coroutine.running()
+  local mains, offs = {}, {}
+  -- what you wear now can be one half of a pair (nothing to buy for that half)
+  if g[16] and g[16].s == "weapon1h" then mains[#mains + 1] = { it = g[16], p = 0, worn = true } end
+  if g[17] and g[16] and g[16].s ~= "weapon2h" then offs[#offs + 1] = { it = g[17], p = 0, worn = true } end
+  for _, h in pairs(hands) do
+    local it = h.it
+    if it.s == "weapon1h" then
+      if it.loc ~= "INVTYPE_WEAPONOFFHAND" then mains[#mains + 1] = h end
+      -- a one-hander can go in the off hand too, for dual wielders ("Main Hand" ones can't)
+      if R.dual and it.loc == "INVTYPE_WEAPON" then offs[#offs + 1] = h end
+    elseif (it.s == "offhand" and R.offhand) or (it.s == "shield" and R.shield) or (it.s == "offweapon" and R.dual) then
+      offs[#offs + 1] = h
+    end
+  end
+  -- only the best few of each, by what each is worth on its own (pairs are tried every way after that)
+  local function best(list, off)
+    for i, h in ipairs(list) do
+      h.solo = ns.Score({ off and ns.AsOffhand(h.it) or h.it }, mode, base, 1)
+      if co and i % 40 == 0 then coroutine.yield() end
+    end
+    table.sort(list, function(a, b) return a.solo > b.solo end)
+    local keep = {}
+    for i, h in ipairs(list) do if i <= POOL or h.worn then keep[#keep + 1] = h end end
+    return keep
+  end
+  mains, offs = best(mains, false), best(offs, true)
+  local found, n = {}, 0
+  for _, m in ipairs(mains) do
+    for _, o in ipairs(offs) do
+      local same = m.it.name == o.it.name
+      -- one listing can't fill both hands; neither can the weapon you're already holding
+      local ok = not (m.worn and o.worn) and not (same and (m.worn or o.worn or (m.n or 1) < 2))
+      if ok then
+        n = n + 1
+        if co and n % 30 == 0 then coroutine.yield() end
+        local gain = ns.Score({ m.it, ns.AsOffhand(o.it) }, mode, base, 1) - old
+        if gain > 0.05 then
+          found[#found + 1] = { m = m, o = o, g = gain, p = (m.worn and 0 or m.p) + (o.worn and 0 or o.p),
+            later = (m.it.rl or 0) > (ns.Level() or 60) or (o.it.rl or 0) > (ns.Level() or 60) }
+        end
+      end
+    end
+  end
+  table.sort(found, function(a, b) return a.g > b.g end)
+  local out = {}
+  for i = 1, math.min(PAIRS_SHOWN, #found) do out[i] = found[i] end
+  if #out > 0 then
+    local value
+    for _, x in ipairs(out) do
+      x.vpg = x.g / math.max(0.01, x.p / 10000)
+      if not value or x.vpg > value.vpg then value = x end
+    end
+    out[1].star = true
+    value.coin = true
+  end
+  return out
+end
+
 local function upgrades(mode)
   local d = data()
   local lvl = ns.Level() or 60
   local bySlot, loading = {}, 0
   local seen = {} -- the same item listed several times: keep the cheapest
+  local hands = {} -- 1.23.0: every one-hander and off-hand in the level range (cheapest listing), for pairs
   local count, asked = 0, 0
   local co = coroutine.running()
   for code, e in pairs(d.items or {}) do
@@ -229,6 +302,11 @@ local function upgrades(mode)
     else
       local rl = it.rl or 0
       local okLevel = levelOK(rl)
+      if okLevel and HAND[it.s] then
+        local h = hands[it.name]
+        if not h then hands[it.name] = { it = it, p = e.p, n = e.n }
+        else h.n = h.n + e.n; if e.p < h.p then h.it, h.p = it, e.p end end
+      end
       if okLevel then
         local key = it.name
         local prev = seen[key]
@@ -264,6 +342,11 @@ local function upgrades(mode)
       list[1].star = true
       value.coin = true
       out[#out + 1] = { slot = s, list = list }
+    end
+    -- the pairs go right after the one-hand weapons (or where they would be)
+    if s == "weapon1h" then
+      local pl = pairs_(mode, hands)
+      if #pl > 0 then out[#out + 1] = { slot = "pairs", pairs = pl } end
     end
   end
   return out, loading
@@ -305,14 +388,31 @@ local function compute(mode, key)
 end
 
 -- put the item in the auction house search (you buy it there)
+-- the item's real name: from the link's [Name] first (what you see), then the game's name for the item ID.
+-- 1.21.1: the saved name could be the item code or ID, which the AH can't search for.
+local function realName(it)
+  local function good(n) return type(n) == "string" and n ~= "" and not n:match("^%d+$") and not n:find("item:", 1, true) and n end
+  local n = good(it.link and it.link:match("|h%[(.-)%]|h"))
+  if not n and it.id and C_Item and C_Item.GetItemNameByID then n = good(C_Item.GetItemNameByID(it.id)) end
+  if not n and it.id then n = good((GetInfo(it.id))) end
+  return n or good(it.name)
+end
+
 local function find(it)
   local f, A = AuctionHouseFrame, C_AuctionHouse
   if not (f and f:IsShown()) then say("open the auction house first."); return end
-  local ok = pcall(function()
+  local name = realName(it)
+  if not name then
+    if it.id and RequestItem then RequestItem(it.id) end
+    say("still loading that item's name; click Find again in a moment."); return
+  end
+  local ok, err = pcall(function()
     if AuctionHouseFrameDisplayMode and f.SetDisplayMode then f:SetDisplayMode(AuctionHouseFrameDisplayMode.Buy) end
-    f.SearchBar:SetSearchText(it.name)
+    f.SearchBar:SetSearchText(name)
     f.SearchBar:StartSearch()
   end)
+  if ok then say("searching the auction house for " .. (it.link or name) .. ".")
+  else say("couldn't use the search box (" .. tostring(err) .. "); trying the item directly.") end
   if not ok and A and A.MakeItemKey then pcall(function() f:SelectBrowseResult({ itemKey = A.MakeItemKey(it.id) }) end) end
 end
 
@@ -348,6 +448,56 @@ local function row(i)
     "Searches for this item in the auction house, so you can buy it there.")
   rows[i] = r
   return r
+end
+
+-- 1.23.0: a pair card: one framed box holding the main hand and the off-hand, joined by a gold bracket
+-- with a "+", one combined upgrade and total price for both, and a Find button for each item to buy
+local PAIRH = 2 * ROWH + 8
+local function pairRow(i)
+  local r = pairRows[i]
+  if r then return r end
+  r = UI.Frame(content, C.row)
+  r:SetHeight(PAIRH - 4)
+  -- the bracket: a gold line down the left joining both items, with a "+" in the middle
+  r.br = r:CreateTexture(nil, "ARTWORK"); r.br:SetColorTexture(C.gold[1], C.gold[2], C.gold[3], 0.85); r.br:SetWidth(2)
+  r.br:SetPoint("TOPLEFT", 12, -20); r.br:SetPoint("BOTTOMLEFT", 12, 20)
+  r.t1 = r:CreateTexture(nil, "ARTWORK"); r.t1:SetColorTexture(C.gold[1], C.gold[2], C.gold[3], 0.85); r.t1:SetSize(8, 2)
+  r.t1:SetPoint("TOPLEFT", r.br, "TOPLEFT", 0, 0)
+  r.t2 = r:CreateTexture(nil, "ARTWORK"); r.t2:SetColorTexture(C.gold[1], C.gold[2], C.gold[3], 0.85); r.t2:SetSize(8, 2)
+  r.t2:SetPoint("BOTTOMLEFT", r.br, "BOTTOMLEFT", 0, 0)
+  r.plusBg = r:CreateTexture(nil, "OVERLAY"); r.plusBg:SetColorTexture(C.row[1], C.row[2], C.row[3], 1); r.plusBg:SetSize(14, 14)
+  r.plusBg:SetPoint("CENTER", r.br, "CENTER", 1, 0)
+  r.plus = UI.Text(r, "GameFontNormalLarge", C.gold); r.plus:SetText("+")
+  r.plus:SetPoint("CENTER", r.br, "CENTER", 1, 1)
+  r.cells, r.finds, r.prices = {}, {}, {}
+  for k = 1, 2 do
+    r.cells[k] = ns.MakeCell(r, 26, 300, 30, true)
+    r.prices[k] = UI.Text(r, "GameFontHighlightSmall"); r.prices[k]:SetJustifyH("RIGHT"); r.prices[k]:SetWidth(100)
+    r.finds[k] = UI.Button(r, 56, 24, "Find", function() local h = r.x and (k == 1 and r.x.m or r.x.o); if h then find(h.it) end end,
+      "Searches for this item in the auction house, so you can buy it there.")
+  end
+  r.marks = UI.Text(r, "GameFontHighlight")
+  r.bar = UI.Bar(r, 70)
+  r.gain = UI.Text(r, "GameFontHighlight")
+  r.total = UI.Text(r, "GameFontHighlightSmall", C.muted); r.total:SetJustifyH("RIGHT")
+  pairRows[i] = r
+  return r
+end
+
+local function layoutPair(r, w)
+  r:SetWidth(w)
+  for k = 1, 2 do
+    local y = k == 1 and -5 or -(ROWH + 3)
+    r.finds[k]:ClearAllPoints(); r.finds[k]:SetPoint("TOPRIGHT", -8, y - 5)
+    r.prices[k]:ClearAllPoints(); r.prices[k]:SetPoint("RIGHT", r.finds[k], "LEFT", -10, 0)
+    r.cells[k]:ClearAllPoints(); r.cells[k]:SetPoint("TOPLEFT", 26, y)
+    r.cells[k]:SetWidth(math.max(160, w - 26 - 56 - 100 - 14 - 90 - 8 - 70 - 10 - 44 - 20))
+  end
+  -- the combined numbers sit between the items and the prices, centred on the card
+  r.gain:ClearAllPoints(); r.gain:SetPoint("RIGHT", r, "RIGHT", -8 - 56 - 10 - 100 - 14, 6)
+  r.total:ClearAllPoints(); r.total:SetPoint("TOPRIGHT", r.gain, "BOTTOMRIGHT", 0, -3)
+  r.bar:ClearAllPoints(); r.bar:SetPoint("RIGHT", r.gain, "LEFT", -8, 0)
+  r.marks:ClearAllPoints(); r.marks:SetPoint("RIGHT", r.bar, "LEFT", -10, 0)
 end
 
 local function layoutRow(r, w)
@@ -401,16 +551,53 @@ function ns.RenderAH(fromCompute)
   local w = scroll:GetWidth()
   if not w or w < 100 then w = 700 end
   content:SetWidth(w)
-  local y, nh, nr = 0, 0, 0
+  local y, nh, nr, np = 0, 0, 0, 0
   for _, g in ipairs(groups) do
     nh = nh + 1
     local h = heading(nh)
     h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y); h:SetWidth(w)
-    h.text:SetText(SLOTNAME[g.slot] or g.slot)
+    h.text:SetText((SLOTNAME[g.slot] or g.slot) .. (g.pairs and (HX.dim .. "  ·  scored together, the same scale as two-handers|r") or ""))
     h:Show()
     y = y + HEADH + 4
-    local maxG = g.list[1].g
-    for _, x in ipairs(g.list) do
+    if g.pairs then
+      local maxG = g.pairs[1].g
+      for i, x in ipairs(g.pairs) do
+        np = np + 1
+        local r = pairRow(np)
+        r.x = x
+        layoutPair(r, w)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        for k, half in ipairs({ x.m, x.o }) do
+          local cell, it = r.cells[k], half.it
+          ns.SetCell(cell, { it }, { glow = x.star and not half.worn })
+          local hand = HX.gold .. (k == 1 and "Main hand" or "Off hand") .. "|r"
+          local lvlTxt = ((it.rl or 0) > lvl and HX.red or "") .. "Level " .. (it.rl or 0) .. ((it.rl or 0) > lvl and "|r" or "")
+          if half.worn then
+            cell.sub:SetText(hand .. HX.dim .. " · you're wearing this, keep it|r")
+            r.prices[k]:SetText(HX.dim .. "worn|r")
+            r.finds[k]:Hide()
+          else
+            cell.sub:SetText(hand .. HX.dim .. " · |r" .. lvlTxt .. HX.dim .. ((half.n or 1) > 1 and (" · " .. half.n .. " listed") or "") .. "|r")
+            r.prices[k]:SetText(money(half.p))
+            r.finds[k]:Show(); r.finds[k]:SetEnabled(ahOpen())
+          end
+        end
+        local marks = {}
+        if x.star then marks[#marks + 1] = UI.STAR end
+        if x.coin then marks[#marks + 1] = COIN end
+        r.marks:SetText(table.concat(marks, " "))
+        r.bar:SetValue(maxG > 0 and x.g / maxG or 0)
+        r.gain:SetText(ns.FmtGain(x.g))
+        r.total:SetText("for both: " .. money(x.p))
+        -- always trimmed in gold so the two items read as one card; brighter for the biggest upgrade
+        r:SetBackdropColor(1, 0.82, 0, x.star and 0.07 or 0.03)
+        r:SetBackdropBorderColor(1, 0.82, 0, x.star and 0.55 or 0.3)
+        r:Show()
+        y = y + PAIRH
+      end
+    end
+    local maxG = g.list and g.list[1].g
+    for _, x in ipairs(g.list or {}) do
       nr = nr + 1
       local r = row(nr)
       r.x = x
@@ -436,9 +623,10 @@ function ns.RenderAH(fromCompute)
   end
   for i = nh + 1, #heads do heads[i]:Hide() end
   for i = nr + 1, #rows do rows[i]:Hide() end
+  for i = np + 1, #pairRows do pairRows[i]:Hide() end
   content:SetHeight(math.max(10, y))
 
-  if nr == 0 then
+  if nr == 0 and np == 0 then
     page.empty:SetText(d.items and (loading > 0 and "Loading item details..." or
       "No upgrades on the auction house for this spec" .. (filtering() and " in that level range." or ".")) or
       "Open the auction house and click Scan. Gear reads every listing and lists the 5 biggest upgrades for each slot.")

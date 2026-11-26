@@ -32,6 +32,7 @@ local function readEquipped()
   -- weapon DPS and attack power, for extra-attack procs
   local mh = equipped[16]
   ns.CTX.wdps = mh and mh.st.wdps or 0
+  ns.CTX.wspd = mh and mh.spd or 0
   -- attack power, armor, health: read out of combat only (they can be hidden while fighting); keep the last known numbers
   if not ns.InCombat() then
     local _, effArmor = ns.safe(UnitArmor, "player")

@@ -11,10 +11,10 @@ local GetStats = (C_Item and C_Item.GetItemStats) or GetItemStats
 ---------------------------------------------------------------------------
 ns.DEFAULT_W = {
   bear = { wdps = 9.8, str = 1.4, agi = 2.2, sta = 2.0, ap = 0.7, fap = 0.7, hit = 2.0, exp = 3.6, crit = 0.7, haste = 0.9,
-           armor = 0.12, def = 1.6, dodge = 0.85, parry = 0, wskill = 2, int = 0.1, spi = 0.1, hp = 0.2, holyres = 0,
+           armor = 0.12, def = 1.6, dodge = 0.3, parry = 0, wskill = 2, arp = 0.27, int = 0.1, spi = 0.1, hp = 0.2, holyres = 0,
            fireres = 0.2, natureres = 0.2, frostres = 0.2, shadowres = 0.2, arcaneres = 0.2, sp = 0, heal = 0, mp5 = 0 },
   cat  = { wdps = 14, str = 2.4, agi = 2.5, sta = 0.05, ap = 1, fap = 1, hit = 2.8, exp = 2.2, crit = 1.9, haste = 1.2,
-           armor = 0, def = 0, dodge = 0, parry = 0, wskill = 3, int = 0.15, spi = 0.1, hp = 0, holyres = 0,
+           armor = 0, def = 0, dodge = 0, parry = 0, wskill = 3, arp = 0.38, int = 0.15, spi = 0.1, hp = 0, holyres = 0,
            fireres = 0, natureres = 0, frostres = 0, shadowres = 0, arcaneres = 0, sp = 0, heal = 0, mp5 = 0 },
   -- Balance: per point, spell power = 1. Order from the Wowhead Forever Balance guide:
   -- hit (to the cap) > spell damage > spell penetration > crit > haste > Intellect > Spirit > Stamina.
@@ -164,6 +164,12 @@ function ns.InitDB()
     end
     db.weightsVersion = 7
   end
+  -- 1.21: Bear dodge lowered again, to match the Pawn and WoWSims Forever Bear sets (1% dodge ~ 1.3-2.4
+  -- Stamina there; it was ~5). Only changed if you hadn't set your own.
+  if (db.weightsVersion or 1) < 8 then
+    if db.weights.bear.dodge == 0.85 then db.weights.bear.dodge = ns.DEFAULT_W.bear.dodge end
+    db.weightsVersion = 8
+  end
   ns.db = db
   return db
 end
@@ -181,7 +187,7 @@ local GIS = {
   ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "sp", ITEM_MOD_SPELL_HEALING_DONE_SHORT = "heal", ITEM_MOD_HEALTH_SHORT = "hp",
   ITEM_MOD_MANA_REGENERATION_SHORT = "mp5", ITEM_MOD_POWER_REGEN0_SHORT = "mp5",
   ITEM_MOD_HIT_SPELL_RATING_SHORT = "shit", ITEM_MOD_CRIT_SPELL_RATING_SHORT = "scrit", ITEM_MOD_HASTE_SPELL_RATING_SHORT = "shaste",
-  ITEM_MOD_SPELL_PENETRATION_SHORT = "spen",
+  ITEM_MOD_SPELL_PENETRATION_SHORT = "spen", ITEM_MOD_ARMOR_PENETRATION_RATING_SHORT = "arp",
   RESISTANCE2_NAME = "fireres", RESISTANCE3_NAME = "natureres", RESISTANCE4_NAME = "frostres", RESISTANCE5_NAME = "shadowres", RESISTANCE6_NAME = "arcaneres",
 }
 -- tooltip patterns (matched on lower-case text), used only for stats the game's stat list didn't report
@@ -216,6 +222,10 @@ local TT = {
   { "damage done by magical spells and effects by up to (%d+)", "sp" }, { "spell power by (%d+)", "sp" },
   { "^equip: restores (%d+) mana per 5 sec", "mp5" }, { "(%d+) mana every 5 sec", "mp5" },
   { "^%+(%d+) (%a+) resistance$", "res" },
+  -- 1.21: Feral skill (weapon skill in Cat and Bear Form) and armor penetration
+  { "increased feral combat %+(%d+)", "wskill" }, { "feral combat skill by (%d+)", "wskill" },
+  { "feral skill by (%d+)", "wskill" }, { "^equip: %+(%d+) feral", "wskill" },
+  { "armor penetration by (%d+)", "arp" }, { "^equip: your attacks ignore (%d+) of", "arp" },
 }
 
 local LOC2S = {
@@ -293,6 +303,13 @@ function ns.ItemStats(link)
   end
   local fx, pending = {}, false
   local lines = ns.tooltipLines("link", link) or {}
+  -- 1.21.2: the weapon's own speed ("Speed 2.90"), for proc chances; from "94 - 141 Damage" / DPS if missing
+  local spd, dlo, dhi
+  for _, line in ipairs(lines) do
+    local l = line:lower()
+    spd = spd or tonumber(l:match("^speed (%d+%.?%d*)$"))
+    if not dlo then dlo, dhi = l:match("^(%d+) %- (%d+) damage") end
+  end
   if #lines < 2 then pending = true end
   for _, line in ipairs(lines) do
     local l = line:lower()
@@ -334,8 +351,11 @@ function ns.ItemStats(link)
   if st.wdps then st.wdps = math.floor(st.wdps * 100 + 0.5) / 100 end
   -- a bow, gun, crossbow or thrown weapon: its damage per second is ranged weapon DPS
   if slot == "ranged" and st.wdps then st.rwdps = st.wdps; st.wdps = nil end
+  if not spd and dlo and (st.wdps or st.rwdps or 0) > 0 then
+    spd = math.floor((tonumber(dlo) + tonumber(dhi)) / 2 / (st.wdps or st.rwdps) * 100 + 0.5) / 100
+  end
   local id = tonumber(link:match("item:(%d+)"))
-  local it = { id = id, link = link, name = name, q = quality, rl = reqLevel or 0, s = slot, st = st, fx = (#fx > 0) and fx or nil,
+  local it = { id = id, link = link, name = name, spd = spd, q = quality, rl = reqLevel or 0, s = slot, st = st, fx = (#fx > 0) and fx or nil,
                loc = equipLoc, cls = classID, sub = subclassID }
   -- weapons and anything with an effect line get read again shortly, in case part of the text was still loading;
   -- after that the result is kept
@@ -364,7 +384,15 @@ local function hitsPerMin(mode, scen)
   return scen == 3 and 84 or 34                      -- tanks (Bear: Swipe on 3 targets)
 end
 local function hitsTakenPerMin(mode, scen) if ns.IsTank(mode) then return scen == 3 and 60 or 25 end return 0 end
-ns.CTX = { wdps = 0, ap = 0 } -- equipped weapon DPS and attack power, for extra-attack procs
+ns.CTX = { wdps = 0, ap = 0, wspd = 0 } -- equipped weapon DPS, attack power and main-hand speed, for procs
+-- only hits that land can proc (misses, dodges and parries don't): about 92% of swings
+local LANDED = 0.92
+-- 1.22.0: Cat and Bear Form, from WoWSims Forever's Forever logs (EV-0003, EV-0119, EV-0122): a weapon's proc is
+-- priced on the paw's speed (Cat 1.0, Bear 2.5), not the weapon's, and only white swings roll it (0 procs in 16,655
+-- Cat Form specials). So in a form a weapon proc rolls on the paw's white swings only (Swipe targets add none).
+-- The Bear part is carried over from Cat: Bear Form has almost no data yet.
+local PAW_WHITE = { cat = 60, bear = 24 } -- white swings a minute at the paw's speed
+local ATTACKER_SPEED = 2.0                -- a typical enemy's swing, for "when struck" rates in procs per minute
 
 local function cdFromText(d)
   local n, unit = (d or ""):match("%((%d+%.?%d*) (%a+) cooldown%)")
@@ -426,11 +454,26 @@ function ns.EffectStats(it, mode, scen)
         elseif e.kind == "dmg" then add({ ap = e.val / cd * 14 }, 1)
         elseif e.kind == "absorb" then add({ sta = e.val / 10 * math.min(1, 60 / cd) }, 1) end
       else
-        local perHit = (e.chance and e.chance > 0) and e.chance / 100 or S / 60
+        -- a proc's chance per landed hit = PPM x speed / 60. The PPM: a measured rate from ProcRates.lua (WoWSims
+        -- Forever) first, else 1. The speed: the weapon's printed speed (the item's own if it's a weapon, else your
+        -- main hand's), but the paw's in Cat or Bear Form (1.22.0). A flat chance (from the table or a stated "2%
+        -- chance") is used as it is.
+        local rate = ns.PROC_RATES and it.id and ns.PROC_RATES[it.id]
+        local isWeapon = it.spd and it.spd > 0
+        local paw = PAW_WHITE[mode] ~= nil
+        local wspd = (paw and S) or (isWeapon and it.spd) or (ns.CTX.wspd and ns.CTX.wspd > 0 and ns.CTX.wspd) or S
+        if trig == "struck" then wspd = ATTACKER_SPEED end
+        local perHit
+        if rate and rate.chance then perHit = rate.chance
+        elseif rate and rate.ppm then perHit = rate.ppm * wspd / 60
+        elseif e.chance and e.chance > 0 then perHit = e.chance / 100
+        else perHit = wspd / 60 end
         -- a damage shield (like Thorns) fires on every melee hit you take, it isn't a random proc
-        if trig == "struck" and not (e.chance and e.chance > 0) and not desc:lower():find("chance") then perHit = 1 end
+        if trig == "struck" and not rate and not (e.chance and e.chance > 0) and not desc:lower():find("chance") then perHit = 1 end
         local n = trig == "struck" and hitsTakenPerMin(mode, scen) or hitsPerMin(mode, scen)
-        local perMin = perHit * n
+        -- in a form a weapon's proc rolls on white swings only
+        if trig ~= "struck" and paw and isWeapon then n = PAW_WHITE[mode] end
+        local perMin = perHit * n * (trig == "struck" and 1 or LANDED)
         if e.kind == "dmg" then add({ ap = perMin * e.val / 60 * 14 }, 1)
         elseif e.kind == "stat" then add(e.st, math.min(1, perMin * ((e.dur and e.dur > 0) and e.dur or 10) / 60))
         elseif e.kind == "extra" then add({ wdps = perMin * e.val * S / 60 * (ns.CTX.wdps + ns.CTX.ap / 14) }, 1)
@@ -447,7 +490,18 @@ end
 local CRIT_RATING_PER_PCT, DODGE_RATING_PER_PCT = 14, 12
 local FormArmorMultiplier
 local SURVIVAL = { sta = 1, armor = 1, def = 1, dodge = 1, parry = 1, hp = 1, fireres = 1, natureres = 1, frostres = 1, shadowres = 1, arcaneres = 1, holyres = 1 }
-local THREAT = { wdps = 1, str = 1, ap = 1, fap = 1, hit = 1, exp = 1, crit = 1, haste = 1, wskill = 1 }
+local THREAT = { wdps = 1, str = 1, ap = 1, fap = 1, hit = 1, exp = 1, crit = 1, haste = 1, wskill = 1, arp = 1 }
+
+-- 1.21: raid weights for Feral at level 60 when the caps are for raid bosses (level 63). From WoWSims Forever
+-- pre-raid weights: Cat values crit above hit and haste lower; Feral skill is worth far more against
+-- +3 bosses (it cuts glancing blows and misses). Multiplies your weights, so your own changes still count.
+local RAID_W = {
+  cat  = { crit = 2.17 / 1.9, hit = 2.3 / 2.8, haste = 0.72 / 1.2, wskill = 16 / 3 },
+  bear = { wskill = 6 / 2 },
+}
+function ns.RaidWeights(mode)
+  return RAID_W[mode] and ((ns.Level and ns.Level()) or 60) >= 60 and ns.CapTarget() == "raid" and RAID_W[mode] or nil
+end
 
 -- weights for a mode, with the Bear Survival <-> Threat focus applied
 -- and with your talents applied: "+20% Stamina in Bear Form" makes Stamina on gear worth 20% more for Bear
@@ -456,9 +510,10 @@ function ns.Weights(mode)
   local f = ns.IsTank(mode) and (ns.db.bearFocus or 0) / 100 or 0
   local tal = (ns.db.useTalents ~= false and not ns.Previewing() and ns.TalentMods and ns.TalentMods[mode]) or {}
   local liveArmor = mode == "bear" and ns.LiveArmorWeight(w) or nil
+  local raid = ns.RaidWeights(mode) or {}
   local out = {}
   for k, v in pairs(w) do
-    local x = v
+    local x = v * (raid[k] or 1)
     if k == "armor" and liveArmor then x = liveArmor end
     if f ~= 0 then x = x * (SURVIVAL[k] and (1 - 0.6 * f) or THREAT[k] and (1 + 0.6 * f) or 1) end
     if tal[k] then x = x * (1 + tal[k]) end
@@ -594,7 +649,7 @@ ns.CAP_TARGETS = {
   { key = "auto",    text = "Automatic",      tip = "Your level until 60, then raid bosses." },
   { key = "level",   text = "My level",       tip = "Questing: mobs your own level." },
   { key = "dungeon", text = "Dungeon bosses", tip = "Bosses and trash 2 levels above you." },
-  { key = "raid",    text = "Raid bosses",    tip = "Bosses 3 levels above you (level 63 at 60)." },
+  { key = "raid",    text = "Raid bosses",    tip = "Bosses 3 levels above you (level 63 at 60). At 60, Feral also uses raid weights." },
   { key = "custom",  text = "Custom",         tip = "Type your own numbers below." },
 }
 local CAP_DIFF = { level = 0, dungeon = 2, raid = 3 }
