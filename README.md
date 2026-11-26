@@ -12,6 +12,7 @@ Built by **Crayon Ponyfish**.
 | Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house, sortable columns, and a Vendor items button that sells the items you tick |
 | Top Ramen ThunderCats | `/trtc` | Plays a ThunderCats clip when you cast Shifting Power: shuffle the clips you tick or always play one, with previews, a volume slider and a "Sometimes stay quiet" setting so it isn't overdone. Clips are not included; put your own in `Interface\AddOns\TopRamenThunderCats_Sounds` |
 | Top Ramen Map *(test)* | `/trmap` | Big live minimap and whole-dungeon overview. Needs the Forever Dungeon Journal addon for its map images |
+| Top Ramen Procs *(test)* | `/trp` | Counts how often the gear you wear really procs, from the combat log, next to what Top Ramen Gear assumes. Share counts with your group and export them to improve Gear's scores |
 
 **Opening them:** every Top Ramen addon shares one bowl button on the minimap. Click it for a menu of the addons you have, right-click to reopen the last one, and drag it to move it. Each row has a **Macro** button that makes a macro for your action bar. You can also type `/tr` for the menu, `/tr button` to hide or show the minimap button, or set a hotkey under Esc → Key Bindings → AddOns.
 

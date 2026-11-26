@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="TOPRAMENPROCS_OPEN" header="TOPRAMENPROCS" category="ADDONS">
+    TopRamenProcs_TRLaunch()
+  </Binding>
+</Bindings>

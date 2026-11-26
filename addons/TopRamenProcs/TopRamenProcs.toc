@@ -1,0 +1,21 @@
+## Interface: 16001
+## Title: Top Ramen Procs
+## Notes: /trp opens the proc logger: how often the gear you wear really procs, counted from the combat log, next to what Top Ramen Gear assumes. Share counts with your group and export them to improve Gear's scores.
+## Author: Top Ramen
+## Version: 0.2.0
+## SavedVariables: TopRamenProcsDB, TopRamenLauncherDB
+## OptionalDeps: TopRamenGear
+## IconTexture: Interface\AddOns\TopRamenProcs\Media\trIcon
+## AddonCompartmentFunc: TopRamenProcs_TRLaunch
+## X-TR-Letter: P
+## X-TR-Label: Procs
+## X-TR-Cmd: /trp
+## X-TR-Slash: TOPRAMENPROCS
+## X-TR-Color: 2dd4bf
+## X-TR-Icon: Spell_Nature_LightningShield
+## X-TR-Order: 7
+
+TRUI.lua
+Procs.lua
+Window.lua
+TRLauncher.lua

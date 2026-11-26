@@ -1,6 +1,7 @@
 {
   "_help": "Addons listed under test only show in the launcher when 'Show test addons' is ticked. Move a name out of this list to release it to everyone.",
   "test": [
-    "TopRamenMap"
+    "TopRamenMap",
+    "TopRamenProcs"
   ]
 }
