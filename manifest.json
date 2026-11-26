@@ -59,15 +59,6 @@
       "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.7.0.zip",
       "size": 79162,
       "sha256": "dd151b583ee5e7fb65747bd3a0429eebc8c593285795e77b32edfddc38b6c881"
-    },
-    {
-      "folder": "TopRamenProcs",
-      "title": "Top Ramen Procs",
-      "version": "0.2.0",
-      "notes": "/trp opens the proc logger: how often the gear you wear really procs, counted from the combat log, next to what Top Ramen Gear assumes. Share counts with your group and export them to improve Gear's scores.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenProcs-0.2.0.zip",
-      "size": 70986,
-      "sha256": "67d784922f935a7820bed65fba1d5fba7328c3b136ec3f2e52d183d012d1f3d4"
     }
   ],
   "launcher": {

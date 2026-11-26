@@ -5,6 +5,7 @@ Run from the repository root:  python3 tools/build_release.py
 
 Addons named under "test" in channels.json go in a separate testAddons list,
 shown only when the player ticks "Show test addons" in the launcher.
+Addons named under "hidden" stay in the repository but aren't offered at all.
 
 For every folder in addons/ it reads "## Version:" from the .toc, writes
 releases/<Addon>-<version>.zip (with the addon folder at the top of the zip,
@@ -64,11 +65,13 @@ def main():
     if os.path.exists(mpath):
         old = json.load(open(mpath))
     chan_path = os.path.join(ROOT, "channels.json")
-    test = set(json.load(open(chan_path)).get("test", [])) if os.path.exists(chan_path) else set()
+    chan = json.load(open(chan_path)) if os.path.exists(chan_path) else {}
+    test = set(chan.get("test", []))
+    hidden = set(chan.get("hidden", []))  # kept in the repository, not offered by the launcher
     entries, test_entries = [], []
     for name in sorted(os.listdir(addons_dir)):
         folder = os.path.join(addons_dir, name)
-        if not os.path.isdir(folder):
+        if not os.path.isdir(folder) or name in hidden:
             continue
         t = toc_fields(folder)
         ver = t.get("Version")

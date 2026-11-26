@@ -12,7 +12,6 @@ Built by **Crayon Ponyfish**.
 | Top Ramen Farm | `/trfarm` | Farming tracker: loot tally, vendor value vs. auction house, sortable columns, and a Vendor items button that sells the items you tick |
 | Top Ramen ThunderCats | `/trtc` | Plays a ThunderCats clip when you cast Shifting Power: shuffle the clips you tick or always play one, with previews, a volume slider and a "Sometimes stay quiet" setting so it isn't overdone. Clips are not included; put your own in `Interface\AddOns\TopRamenThunderCats_Sounds` |
 | Top Ramen Map *(test)* | `/trmap` | Big live minimap and whole-dungeon overview. Needs the Forever Dungeon Journal addon for its map images |
-| Top Ramen Procs *(test)* | `/trp` | Counts how often the gear you wear really procs, from the combat log, next to what Top Ramen Gear assumes. Share counts with your group and export them to improve Gear's scores |
 
 **Opening them:** every Top Ramen addon shares one bowl button on the minimap. Click it for a menu of the addons you have, right-click to reopen the last one, and drag it to move it. Each row has a **Macro** button that makes a macro for your action bar. You can also type `/tr` for the menu, `/tr button` to hide or show the minimap button, or set a hotkey under Esc → Key Bindings → AddOns.
 
@@ -52,7 +51,7 @@ Download an addon's zip from [`releases/`](releases/) and unzip it into `World o
 
 **Players' own files:** an addon can list folders of the player's own files in its `.toc`, for example `## X-TR-Keep: Sounds`. The launcher (1.13.0 and later) carries those folders over when it updates the addon. Top Ramen ThunderCats also reads clips from `Interface\AddOns\TopRamenThunderCats_Sounds`, a separate folder no update ever touches.
 
-**Test or released?** `channels.json` lists the addons that are still in testing. Only people who tick "Show test addons" see those. To release one to everyone, remove its name from that list and run the build again.
+**Test or released?** `channels.json` lists the addons that are still in testing. Only people who tick "Show test addons" see those. To release one to everyone, remove its name from that list and run the build again. Addons listed under `hidden` stay in the repository but the launcher doesn't offer them at all.
 
 To release a new launcher: raise `launcher/VERSION` and push. The **Sign launcher** GitHub workflow builds it on Windows, signs it with Azure Artifact Signing (so Windows Smart App Control allows it), and commits the signed `.exe`, `.zip` and `manifest.json`. Older launchers then show a "new launcher available" notice. Don't commit an unsigned build from `tools/build_launcher.sh` over the signed one: that script is only for local testing.
 
