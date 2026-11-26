@@ -23,9 +23,9 @@ local saved
 ---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
-local frame = UI.Window("TopRamenMapFrame")
+local frame = UI.Window("TopRamenMapFrame", 1) -- fully opaque: nothing behind shows through
 frame:Hide()
-frame:SetFrameStrata("MEDIUM")
+frame:SetFrameStrata("HIGH")
 frame:SetClampedToScreen(true)
 frame:SetMovable(true)
 frame:SetResizable(true)
@@ -377,6 +377,21 @@ frame:SetScript("OnHide", function()
   Detach(); autoOpened = false
   if areaTicker then areaTicker:Cancel(); areaTicker = nil end
 end)
+
+-- Layering: join the other Top Ramen windows (the one opened or clicked last
+-- is on the "HIGH" layer above the game's bars and frames, the rest drop to
+-- "MEDIUM"). The borrowed minimap has to follow the window's layer, or it
+-- would be drawn under the window or poke through windows above it.
+-- (Registered after the scripts above, so their hooks stay in place.)
+local function SyncMinimapLayer()
+  if not attached then return end
+  Minimap:SetFrameStrata(frame:GetFrameStrata())
+  Minimap:SetFrameLevel(holder:GetFrameLevel() + 2)
+end
+UI.RegisterWindow(frame)
+hooksecurefunc(frame, "SetFrameStrata", SyncMinimapLayer)
+hooksecurefunc(frame, "Raise", SyncMinimapLayer)
+frame:HookScript("OnMouseDown", SyncMinimapLayer)
 
 function ApplyPosition()
   frame:ClearAllPoints()
