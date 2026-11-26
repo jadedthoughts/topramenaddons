@@ -44,11 +44,18 @@ end
 ---------------------------------------------------------------------------
 -- Areas: the map's own plus any you placed with Ctrl-click
 ---------------------------------------------------------------------------
+-- Names compare loosely: case, "The", spaces and punctuation don't matter
+-- (the map's printed label and the game's area name can differ a little).
+local function Bare(s) return (s:lower():gsub("^the%s+", ""):gsub("[%s%p]", "")) end
+
 local function BuildAreas()
   areas = {}
   local learned = ns.Learned and ns.Learned(dungeonName) or {}
+  -- an area you placed by hand replaces the map's own one of that name
+  local placed = {}
+  for _, a in pairs(learned) do placed[Bare(a.name) .. "@" .. a.floor] = true end
   for _, a in ipairs(data.areas or {}) do
-    if not learned[a.name .. "@" .. a.floor] then areas[#areas + 1] = a end
+    if not placed[Bare(a.name) .. "@" .. a.floor] then areas[#areas + 1] = a end
   end
   for _, a in pairs(learned) do areas[#areas + 1] = a end
 end
@@ -57,8 +64,8 @@ end
 -- the level shown, else the first.
 local function FindArea(name)
   if not name then return end
-  local list = {}
-  for _, a in ipairs(areas) do if a.name == name then list[#list + 1] = a end end
+  local list, want = {}, Bare(name)
+  for _, a in ipairs(areas) do if a.name == name or Bare(a.name) == want then list[#list + 1] = a end end
   if #list <= 1 then return list[1] end
   local gf = GameFloor()
   for _, a in ipairs(list) do if a.floor == gf then return a end end
@@ -227,7 +234,13 @@ end
 local function PaintStatus()
   if not data then return end
   local left = 0
-  for _, b in ipairs(data.bosses) do if not b.rare and not b.quest and not Dead(b) then left = left + 1 end end
+  local counted = {} -- a boss with several possible spawn spots counts once
+  for _, b in ipairs(data.bosses) do
+    if not b.rare and not b.quest and not counted[b.name] then
+      counted[b.name] = true
+      if not Dead(b) then left = left + 1 end
+    end
+  end
   local multi = #data.floors > 1
   local where
   if current then
@@ -298,12 +311,73 @@ function O.KeyByName(name)
   end
 end
 
+-- A floor is either one image (art, texRight, texBottom) or the game's own
+-- world-map tiles (tiles = "Interface\\WorldMap\\X\\X1_", 12 tiles of 256px
+-- in 4 columns x 3 rows; the map shows the top-left 1002x668 of them), plus
+-- optional patches laid on top (x0, y0, x1, y1 on the map, tex, alpha).
+local tileTex, patchTex = {}, {}
+local TILE_W, TILE_H = 256 / 1002, 256 / 668
+
+local function PlaceArt()
+  local f = data and data.floors[viewFloor]
+  if not f then return end
+  local w, h = art:GetSize()
+  if f.tiles then
+    for i = 1, 12 do
+      local t = tileTex[i]
+      local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
+      -- the last column and row run past the map's edge: trim them
+      local u = (col == 3) and ((1002 - 768) / 256) or 1
+      local v = (row == 2) and ((668 - 512) / 256) or 1
+      t:ClearAllPoints()
+      t:SetSize(TILE_W * w * u, TILE_H * h * v)
+      t:SetTexCoord(0, u, 0, v)
+      t:SetPoint("TOPLEFT", art, "TOPLEFT", col * TILE_W * w, -row * TILE_H * h)
+    end
+  end
+  for i, p in ipairs(f.patches or {}) do
+    local t = patchTex[i]
+    if t then
+      t:ClearAllPoints()
+      t:SetPoint("TOPLEFT", art, "TOPLEFT", p.x0 * w, -p.y0 * h)
+      t:SetSize((p.x1 - p.x0) * w, (p.y1 - p.y0) * h)
+    end
+  end
+end
+
 local function ShowFloor(i)
   if not data or not data.floors[i] then return end
   viewFloor = i
   local f = data.floors[i]
-  art.tex:SetTexture(f.art)
-  art.tex:SetTexCoord(0, f.texRight, 0, f.texBottom)
+  for _, t in ipairs(tileTex) do t:Hide() end
+  for _, t in ipairs(patchTex) do t:Hide() end
+  if f.tiles then
+    art.tex:Hide()
+    for n = 1, 12 do
+      local t = tileTex[n]
+      if not t then
+        t = art:CreateTexture(nil, "BACKGROUND", nil, 1)
+        tileTex[n] = t
+      end
+      t:SetTexture(f.tiles .. n)
+      t:Show()
+    end
+  else
+    art.tex:SetTexture(f.art)
+    art.tex:SetTexCoord(0, f.texRight or 1, 0, f.texBottom or 1)
+    art.tex:Show()
+  end
+  for n, p in ipairs(f.patches or {}) do
+    local t = patchTex[n]
+    if not t then
+      t = art:CreateTexture(nil, "BACKGROUND", nil, 3)
+      patchTex[n] = t
+    end
+    t:SetTexture(p.tex)
+    t:SetAlpha(p.alpha or 1)
+    t:Show()
+  end
+  PlaceArt()
   DrawDots()
   O.Refresh()
 end
@@ -326,6 +400,7 @@ end
 ---------------------------------------------------------------------------
 local function PlaceAll()
   if not data then return end
+  PlaceArt()
   local w, h = art:GetSize()
   for a, g in pairs(glows) do
     local size = a.r * 2 * w
@@ -420,7 +495,8 @@ local function MakePin()
     local b = self.boss
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(b.name, C.gold[1], C.gold[2], C.gold[3])
-    if b.rare then GameTooltip:AddLine("Rare, may not be up", C.muted[1], C.muted[2], C.muted[3]) end
+    if b.rare then GameTooltip:AddLine("Rare, may not be up" .. (b.note and ("; " .. b.note) or ""), C.muted[1], C.muted[2], C.muted[3]) end
+    if b.alt then GameTooltip:AddLine("One of several spots it can appear", C.muted[1], C.muted[2], C.muted[3]) end
     if b.quest then GameTooltip:AddLine("Quest target" .. (b.note and (": " .. b.note) or ""), C.muted[1], C.muted[2], C.muted[3]) end
     local ba = BossArea(b)
     if ba then GameTooltip:AddLine(ba.name, C.text[1], C.text[2], C.text[3]) end
@@ -478,7 +554,7 @@ function O.SetDungeon(name)
   for i, b in ipairs(data.bosses) do
     local p = MakePin()
     p.boss = b
-    p.icon:SetTexture((journal and b.portrait) and (FDJ_PORTRAITS .. b.portrait) or SKULL)
+    p.icon:SetTexture((journal and b.portraitTex) or ((journal and b.portrait) and (FDJ_PORTRAITS .. b.portrait)) or SKULL)
     pins[i] = p
   end
   for i, md in ipairs(data.markers or {}) do marks[i] = MakeMark(md) end

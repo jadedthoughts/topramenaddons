@@ -204,6 +204,7 @@ D["The Drowned City"] = {
     { name = "Captain Dreadrise",    portrait = 142144, floor = 1, x = 0.546, y = 0.344 },
     { name = "Deathless Marrow",     portrait = 142245, floor = 1, x = 0.349, y = 0.536 },
     { name = "Min'loth the Serpent", portrait = 142322, floor = 1, x = 0.196, y = 0.539 },
+    { name = "Gill",                 portrait = 144023, floor = 1, x = 0.446, y = 0.513, rare = true, note = "walks a loop around the middle of the city" },
   },
 }
 

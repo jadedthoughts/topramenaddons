@@ -322,6 +322,22 @@ function ns.Learn(dungeon, area)
 end
 function ns.AllLearned() return db and db.learned or {} end
 
+-- Which dungeon you're in, by the overview's names. ForeverDungeonJournal
+-- knows the game's instance IDs and tells the Scarlet Monastery wings, Dire
+-- Maul and Stratholme apart, and its names are the ones our data uses. If it
+-- can't say, fall back to the game's instance name.
+local function CurrentDungeonName()
+  local FDJ = _G.ForeverDungeonJournal_NS
+  if FDJ and FDJ.CurrentDungeon then
+    local ok, n = pcall(FDJ.CurrentDungeon)
+    if ok and type(n) == "string" and not (issecretvalue and issecretvalue(n)) then return n end
+  end
+  local name = GetInstanceInfo()
+  if issecretvalue and issecretvalue(name) then return nil end
+  return name
+end
+ns.CurrentDungeonName = CurrentDungeonName
+
 ---------------------------------------------------------------------------
 -- Window scripts
 ---------------------------------------------------------------------------
@@ -337,7 +353,8 @@ grip:SetScript("OnMouseUp", function() frame:StopMovingOrSizing(); SavePosition(
 holder:SetScript("OnSizeChanged", Layout)
 frame:SetScript("OnShow", function()
   UpdateTitle(); PaintToggles(); LayoutPanes(); Attach()
-  local name, kind = GetInstanceInfo()
+  local _, kind = GetInstanceInfo()
+  local name = CurrentDungeonName()
   local inside = (kind == "party" or kind == "raid")
   if inside then Run(name) end
   ns.Overview.SetDungeon(inside and name or nil)
@@ -346,7 +363,15 @@ end)
 local areaTicker
 frame:HookScript("OnShow", function()
   if areaTicker then areaTicker:Cancel() end
-  areaTicker = C_Timer.NewTicker(1, function() ns.Overview.SetArea(GetSubZoneText()) end)
+  areaTicker = C_Timer.NewTicker(1, function()
+    -- the Scarlet wing (and the like) can only be told once you're inside
+    local _, kind = GetInstanceInfo()
+    if kind == "party" or kind == "raid" then
+      local name = CurrentDungeonName()
+      if name then Run(name); ns.Overview.SetDungeon(name) end
+    end
+    ns.Overview.SetArea(GetSubZoneText())
+  end)
 end)
 frame:SetScript("OnHide", function()
   Detach(); autoOpened = false
@@ -418,7 +443,7 @@ frame:SetScript("OnEvent", function(_, event, arg1, ...)
   elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
     if InDungeon() then
       if db.autoOpen and not frame:IsShown() then autoOpened = true; frame:Show() end
-      local name = GetInstanceInfo()
+      local name = CurrentDungeonName()
       Run(name)
       ns.Overview.SetDungeon(name)
     else
@@ -457,7 +482,7 @@ SlashCmdList.TOPRAMENMAP = function(msg)
   elseif msg == "areas" then
     ns.Overview.DumpLearned()
   elseif msg == "forget" then
-    local name = GetInstanceInfo()
+    local name = CurrentDungeonName()
     if db.learned then db.learned[name] = nil end
     print(GOLD .. "Top Ramen Map|r: forgot the areas you placed in " .. tostring(name) .. ". /reload to redraw.")
   elseif msg == "help" then

@@ -54,11 +54,11 @@
     {
       "folder": "TopRamenMap",
       "title": "Top Ramen Map",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "notes": "/trmap opens a big live minimap and a whole-dungeon overview with boss pins and routes. /trmap help for options.",
-      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.7.0.zip",
-      "size": 79162,
-      "sha256": "dd151b583ee5e7fb65747bd3a0429eebc8c593285795e77b32edfddc38b6c881"
+      "url": "https://raw.githubusercontent.com/jadedthoughts/topramenaddons/main/releases/TopRamenMap-0.8.0.zip",
+      "size": 88996,
+      "sha256": "fd975b55dd6a312c0224a3246b53a32c7cadeae610f53dfdf1936042634c9cbc"
     }
   ],
   "launcher": {
